@@ -7,6 +7,16 @@ function roomSlug(s) {
   return String(s || "").toLowerCase().split("").map(c => map[c] ?? c).join("").replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 32);
 }
 
+// links opened inside WhatsApp / Telegram / Viber etc. often block the camera: ask to open in Chrome
+(function inAppWarning() {
+  const ua = navigator.userAgent;
+  if (/FBAN|FBAV|Instagram|Line\/|Telegram|WhatsApp|Viber|; wv\)/i.test(ua)) {
+    const b = $("inapp");
+    b.textContent = "⚠ Откройте эту ссылку в браузере Chrome (меню ⋮ → «Открыть в Chrome»), иначе видеозвонок может не работать. / Open this link in Chrome for video calls.";
+    b.classList.remove("hidden");
+  }
+})();
+
 (function start() {
   const saved = store.get("ls-me", {});
   const qs = new URLSearchParams(location.search);

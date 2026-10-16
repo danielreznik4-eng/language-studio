@@ -34,7 +34,32 @@ function readBody(req, limit, cb) {
 // saved lessons live per room: lessons/<ROOM>/<name>.json
 function lessonDir(room) { const d = path.join(LESSONS, room); fs.mkdirSync(d, { recursive: true }); return d; }
 
+// behind a hosting proxy (Render): plain-http visits are redirected to https, and browsers are told to stay on https
+const HOSTED = !!process.env.PORT;
+const insecure = req => HOSTED && String(req.headers["x-forwarded-proto"] || "").split(",")[0].trim() === "http";
+
+// TURN relay (coturn, hosted separately). TURN_URLS = comma list, TURN_SECRET = coturn static-auth-secret.
+// Short-lived credentials (coturn "REST API" scheme): username = expiry:tag, password = base64(HMAC-SHA1(secret, username)).
+const TURN_URLS = String(process.env.TURN_URLS || "").split(",").map(s => s.trim()).filter(Boolean);
+const TURN_SECRET = process.env.TURN_SECRET || "";
+const TURN_TTL = 4 * 3600;
+const turnHits = new Map();   // ip -> [count, windowStart], a light limit on credential requests
+function turnCredentials(req) {
+  if (!TURN_URLS.length || !TURN_SECRET) return { urls: [], ttl: 600 };
+  const ip = String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "").split(",")[0].trim();
+  const now = Date.now(), h = turnHits.get(ip) || [0, now];
+  if (now - h[1] > 60000) { h[0] = 0; h[1] = now; }
+  if (++h[0] > 30) return null;
+  turnHits.set(ip, h);
+  const username = Math.floor(now / 1000 + TURN_TTL) + ":ls" + crypto.randomBytes(4).toString("hex");
+  const credential = crypto.createHmac("sha1", TURN_SECRET).update(username).digest("base64");
+  return { urls: TURN_URLS, username, credential, ttl: TURN_TTL };
+}
+setInterval(() => { const t = Date.now() - 120000; for (const [k, v] of turnHits) if (v[1] < t) turnHits.delete(k); }, 300000).unref();
+
 const server = http.createServer((req, res) => {
+  if (insecure(req)) { res.writeHead(301, { Location: "https://" + req.headers.host + req.url }); return res.end(); }
+  if (HOSTED) res.setHeader("Strict-Transport-Security", "max-age=31536000");
   const url = new URL(req.url, "http://x");
   const json = (code, obj) => { res.writeHead(code, { "Content-Type": TYPES[".json"] }); res.end(JSON.stringify(obj)); };
   if (url.pathname.startsWith("/api/lessons")) {
@@ -62,6 +87,16 @@ const server = http.createServer((req, res) => {
     if (!q.trim()) return json(200, { text: q });
     translate(q, to).then(r => json(200, r)).catch(() => json(502, { error: "translation unavailable" }));
     return;
+  }
+  if (url.pathname === "/api/diag") {   // call reports for a room (no IP addresses or passwords in them)
+    const r = rooms.get(cleanCode(url.searchParams.get("room")));
+    res.setHeader("Cache-Control", "no-store");
+    return json(200, r ? r.reports : []);
+  }
+  if (url.pathname === "/api/turn") {
+    const c = turnCredentials(req);
+    res.setHeader("Cache-Control", "no-store");
+    return c ? json(200, c) : json(429, { error: "slow down" });
   }
   if (url.pathname === "/api/info") return json(200, { addresses: lanAddresses(), port: PORT, hosted: !!process.env.PORT });
   // ---- static files ( /english -> English Coach )
@@ -102,7 +137,7 @@ async function translate(q, to) {
 const rooms = new Map();
 function getRoom(code) {
   let r = rooms.get(code);
-  if (!r) { r = { code, clients: new Set(), state: { lesson: null, slide: 0, follow: true, chat: [] }, empty: Date.now() }; rooms.set(code, r); }
+  if (!r) { r = { code, clients: new Set(), state: { lesson: null, slide: 0, follow: true, chat: [] }, reports: [], empty: Date.now() }; rooms.set(code, r); }
   return r;
 }
 // forget rooms nobody has used for 12 hours
@@ -111,10 +146,11 @@ setInterval(() => { for (const [k, r] of rooms) if (!r.clients.size && Date.now(
 // ---------------------------------------------------------------- minimal WebSocket (RFC 6455)
 server.on("upgrade", (req, socket) => {
   if (req.url !== "/ws" || req.headers.upgrade?.toLowerCase() !== "websocket") return socket.destroy();
+  if (insecure(req)) return socket.destroy();   // hosted: signaling only over wss://
   const key = req.headers["sec-websocket-key"];
   const accept = crypto.createHash("sha1").update(key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11").digest("base64");
   socket.write("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: " + accept + "\r\n\r\n");
-  const client = { socket, id: crypto.randomUUID().slice(0, 8), role: "student", name: "?", room: null, buf: Buffer.alloc(0), parts: [] };
+  const client = { socket, id: crypto.randomUUID().slice(0, 8), role: "student", name: "?", room: null, buf: Buffer.alloc(0), parts: [], partsOp: 1 };
   socket.setNoDelay(true);
   socket.setKeepAlive(true, 30000);
   socket.on("data", d => { client.buf = Buffer.concat([client.buf, d]); readFrames(client); });
@@ -140,9 +176,14 @@ function readFrames(c) {
     if (op === 8) { c.socket.end(); return; }
     if (op === 9) { sendRaw(c, payload, 10); continue; }
     if (op === 10) continue;
-    if (op === 1 || op === 0) {
+    if (op === 1 || op === 2 || op === 0) {
+      if (op !== 0) c.partsOp = op;
       c.parts.push(payload);
-      if (fin) { const text = Buffer.concat(c.parts).toString("utf8"); c.parts = []; try { onMessage(c, JSON.parse(text)); } catch (e) { /* ignore bad message */ } }
+      if (fin) {
+        const data = Buffer.concat(c.parts); c.parts = [];
+        if (c.partsOp === 2) onBinary(c, data);
+        else { try { onMessage(c, JSON.parse(data.toString("utf8"))); } catch (e) { /* ignore bad message */ } }
+      }
     }
   }
 }
@@ -156,7 +197,7 @@ function sendRaw(c, data, op = 1) {
 }
 const send = (c, obj) => sendRaw(c, Buffer.from(JSON.stringify(obj), "utf8"));
 const broadcast = (room, obj, except) => { for (const c of room.clients) if (c !== except) send(c, obj); };
-const roster = room => [...room.clients].map(c => ({ id: c.id, role: c.role, name: c.name, lang: c.lang }));
+const roster = room => [...room.clients].map(c => ({ id: c.id, role: c.role, name: c.name, lang: c.lang, inCall: !!c.inCall }));
 
 function leave(c) {
   const room = c.room; if (!room || !room.clients.delete(c)) return;
@@ -207,9 +248,29 @@ function onMessage(c, msg) {
     case "share-stop":
       broadcast(room, { type: "share-stop", from: c.id }, c);
       break;
-    case "call-join": case "call-leave":
-      broadcast(room, { type: msg.type, from: c.id, name: c.name }, c);
+    case "diag": {
+      const rep = { at: new Date().toISOString(), from: c.name, role: c.role, reason: String(msg.reason || "").slice(0, 80),
+        env: msg.env, lines: Array.isArray(msg.lines) ? msg.lines.slice(-250) : [] };
+      const size = JSON.stringify(rep).length; if (size > 400000) return;
+      room.reports.push(rep); if (room.reports.length > 20) room.reports.shift();
+      for (const t of room.clients) if (t.role === "teacher" && t !== c) send(t, { type: "diag", from: c.name, reason: rep.reason });
       break;
+    }
+    case "call-join": case "call-leave":
+      c.inCall = msg.type === "call-join";
+      broadcast(room, { type: msg.type, from: c.id, name: c.name }, c);
+      broadcast(room, { type: "roster", people: roster(room) });   // latecomers see who is in the call
+      break;
+  }
+}
+
+// media relay (calls that can't connect directly): pass the piece to one person in the same room
+function onBinary(c, data) {
+  if (!c.room || data.length < 9 || data.length > 2 * 1024 * 1024) return;
+  const to = data.subarray(0, 8).toString("latin1");
+  for (const t of c.room.clients) if (t.id === to) {
+    const out = Buffer.from(data); out.write(c.id.padEnd(8).slice(0, 8), 0, "latin1");
+    if (t.socket.writableLength < 4 * 1024 * 1024) sendRaw(t, out, 2);   // drop pieces for a receiver that can't keep up
   }
 }
 

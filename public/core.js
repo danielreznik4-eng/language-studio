@@ -48,13 +48,16 @@ const Net = {
   ws: null, open: false, queue: [], handlers: {},
   connect() {
     const ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws");
-    this.ws = ws;
+    this.ws = ws; ws.binaryType = "arraybuffer";
     ws.onopen = () => {
       this.open = true; setConn(true);
       ws.send(JSON.stringify({ type: "hello", role: App.role, name: App.name, lang: LANG, room: App.room }));
       for (const m of this.queue.splice(0)) ws.send(m);
     };
-    ws.onmessage = e => { let m; try { m = JSON.parse(e.data); } catch (x) { return; } (this.handlers[m.type] || (() => {}))(m); };
+    ws.onmessage = e => {
+      if (typeof e.data !== "string") { const b = new Uint8Array(e.data); if (b.length > 8 && typeof Relay !== "undefined") Relay.onData(new TextDecoder().decode(b.subarray(0, 8)).trim(), b.subarray(8)); return; }
+      let m; try { m = JSON.parse(e.data); } catch (x) { return; } (this.handlers[m.type] || (() => {}))(m);
+    };
     ws.onclose = () => { this.open = false; setConn(false); setTimeout(() => this.connect(), 2000); };
     ws.onerror = () => ws.close();
   },

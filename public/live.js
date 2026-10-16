@@ -45,6 +45,7 @@ const Live = {
     });
     Net.on("roster", m => {
       const before = new Set(App.people.map(p => p.id)); App.people = m.people;
+      Call.checkOngoing();
       if (App.role === "teacher" && this.stream) for (const p of m.people) if (p.role === "student" && !before.has(p.id)) this.call(p.id);
       renderSide();
     });
@@ -62,6 +63,7 @@ const Live = {
     Net.on("pointer", m => { this.pointer = m.on ? [m.x, m.y] : null; drawPointer(); });
     Net.on("rtc", m => m.data?.kind === "call" ? Call.signal(m.from, m.data) : this.signal(m.from, m.data));
     Net.on("call-join", m => Call.onJoin(m.from, m.name));
+    Net.on("diag", m => { if (App.role === "teacher") toast("📋 " + tr("reports") + ": " + m.from + " (" + m.reason + ")", 3000); });
     Net.on("call-leave", m => Call.onLeave(m.from));
     Net.on("share-stop", () => { const v = $("remote"); if (v) v.srcObject = null; this.remoteStream = null; renderSide(); });
   },
@@ -80,23 +82,34 @@ const Live = {
     this.stream = null; for (const pc of this.peers.values()) pc.close(); this.peers.clear();
     Net.send({ type: "share-stop" }); $("b-share").textContent = tr("share");
   },
-  newPeer(id) {
-    const pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] });
+  async newPeer(id, relayOnly) {
+    const pc = new RTCPeerConnection(await RTC.config(relayOnly));
+    Diag.watchPeer(pc, "screen:" + id);
     pc.onicecandidate = e => { if (e.candidate) Net.send({ type: "rtc", to: id, data: { ice: e.candidate } }); };
     pc.ontrack = e => { this.remoteStream = e.streams[0]; renderSide(); };
     this.peers.set(id, pc); return pc;
   },
   async call(id) {
-    const old = this.peers.get(id); if (old) old.close();
-    const pc = this.newPeer(id);
+    const old = this.peers.get(id); if (old) { old._stop?.(); old.close(); }
+    const pc = await this.newPeer(id, arguments[1]);
     this.stream.getTracks().forEach(t => pc.addTrack(t, this.stream));
+    // teacher side drives recovery: ICE restart, then a relay-only rebuild
+    pc._stop = RTC.watch(pc, async level => {
+      if (!this.stream || this.peers.get(id) !== pc) return;
+      try { if (level === 1) { pc.restartIce?.(); await pc.setLocalDescription(await pc.createOffer({ iceRestart: true })); Net.send({ type: "rtc", to: id, data: { sdp: pc.localDescription } }); }
+            else { RTC.expires = 0; await this.call(id, true); } } catch (e) { /* watchdog escalates */ }
+    });
     await pc.setLocalDescription(await pc.createOffer());
-    Net.send({ type: "rtc", to: id, data: { sdp: pc.localDescription } });
+    Net.send({ type: "rtc", to: id, data: { sdp: pc.localDescription, relayOnly: !!arguments[1] } });
   },
   async signal(from, data) {
     let pc = this.peers.get(from);
     if (data.sdp) {
-      if (data.sdp.type === "offer") { if (pc) pc.close(); pc = this.newPeer(from); }
+      if (data.sdp.type === "offer") {
+        const reuse = pc && !data.relayOnly && pc.signalingState === "stable" && !["failed", "closed"].includes(pc.connectionState);
+        if (!reuse) { if (pc) pc.close(); pc = await this.newPeer(from, data.relayOnly); }
+      }
+      if (!pc) return;
       await pc.setRemoteDescription(data.sdp);
       if (data.sdp.type === "offer") { await pc.setLocalDescription(await pc.createAnswer()); Net.send({ type: "rtc", to: from, data: { sdp: pc.localDescription } }); }
     } else if (data.ice && pc) { try { await pc.addIceCandidate(data.ice); } catch (e) { /* late candidate */ } }

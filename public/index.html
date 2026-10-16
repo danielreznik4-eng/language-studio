@@ -19,7 +19,7 @@ input[type=text],input[type=number],select,textarea{background:var(--chip);borde
 .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .hidden{display:none!important}
 /* start screen */
-#start{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto}
+#start{position:fixed;top:0;right:0;bottom:0;left:0;display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto}
 .startcard{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:24px;max-width:640px;width:100%}
 .startcard h1{margin:0 0 4px}
 .roles{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0}
@@ -88,16 +88,16 @@ video#remote{width:100%;border-radius:10px;background:#000}
 .ckeys button{padding:9px 0;border:1px solid var(--line);background:var(--chip);border-radius:7px;cursor:pointer}
 .ckeys button.op{background:var(--acc2)} .ckeys button.eq{background:var(--acc);color:#fff}
 /* CAD */
-#cad{position:fixed;inset:0;z-index:25;background:var(--panel);display:grid;grid-template-rows:auto 1fr}
+#cad{position:fixed;top:0;right:0;bottom:0;left:0;z-index:25;background:var(--panel);display:grid;grid-template-rows:auto 1fr}
 #cadview{position:relative;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 290px}
 #cadside{overflow-x:hidden}
 #cad3d{position:relative;min-height:0}
 #cad3d canvas{display:block;width:100%;height:100%}
-#sketch{position:absolute;inset:0;background:rgba(255,255,255,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px}
+#sketch{position:absolute;top:0;right:0;bottom:0;left:0;background:rgba(255,255,255,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px}
 @media (prefers-color-scheme:dark){#sketch{background:rgba(20,24,32,.95)}}
 #sketch canvas{background:#fff;border:1px solid var(--line);border-radius:8px;cursor:crosshair}
 /* present mode */
-#present{position:fixed;inset:0;z-index:40;background:#000;display:flex;align-items:center;justify-content:center}
+#present{position:fixed;top:0;right:0;bottom:0;left:0;z-index:40;background:#000;display:flex;align-items:center;justify-content:center}
 #present .slidebox{box-shadow:none}
 #present .pbar{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;gap:6px;opacity:.15;transition:opacity .2s}
 #present .pbar:hover{opacity:1}
@@ -107,6 +107,7 @@ video#remote{width:100%;border-radius:10px;background:#000}
 </head>
 <body>
 <!-- start: who are you -->
+<div id="inapp" class="hidden" style="position:fixed;top:0;left:0;right:0;z-index:90;background:#d64545;color:#fff;padding:12px 16px;font-size:16px;text-align:center"></div>
 <div id="start">
   <div class="startcard">
     <h1>🎓 Lesson Studio</h1>
@@ -177,6 +178,9 @@ video#remote{width:100%;border-radius:10px;background:#000}
 <script src="calc.js"></script>
 <script src="cad.js"></script>
 <script src="live.js"></script>
+<script src="rtc.js"></script>
+<script src="diag.js"></script>
+<script src="relay.js"></script>
 <script src="call.js"></script>
 <script src="main.js"></script>
 </body>

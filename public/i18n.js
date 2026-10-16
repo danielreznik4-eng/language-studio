@@ -71,6 +71,10 @@ const STR = {
   callBlocked: ["Camera or microphone access is blocked. Click the camera icon next to the address and choose Allow.", "Доступ к камере или микрофону запрещён. Нажми значок камеры рядом с адресом и выбери «Разрешить»."],
   camera: ["Camera", "Камера"], microphone: ["Microphone", "Микрофон"],
   callNeedsHttps: ["Video calls need the online (https) link. On home Wi-Fi addresses the browser blocks the camera.", "Для видеозвонка нужна онлайн-ссылка (https). По домашнему адресу браузер блокирует камеру."],
+  callingYou: ["is calling you (video call)", "звонит вам (видеозвонок)"], answer: ["Answer", "Ответить"],
+  reconnecting: ["reconnecting", "переподключение"], callLost: ["connection lost", "связь потеряна"],
+  sendReport: ["Send a call report to the teacher (for fixing problems)", "Отправить отчёт о звонке учителю (для исправления проблем)"],
+  reportSent: ["Report sent ✔", "Отчёт отправлен ✔"], reports: ["Call reports", "Отчёты о звонках"],
   open3d: ["🧊 Turn the 3D model", "🧊 Вращать 3D-модель"],
   // present
   exitPresent: ["Exit (Esc)", "Выход (Esc)"], laser: ["Laser pointer", "Лазерная указка"],
