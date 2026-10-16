@@ -90,7 +90,8 @@ function slideSVG(s, opts = {}) {
 // fit a 16:9 slide box inside its parent
 function fitBox(box) {
   const p = box.parentElement, pw = p.clientWidth - 24, ph = p.clientHeight - 24;
-  const scale = Math.max(0.1, Math.min(pw / W, ph / H));
+  // phones (simple mode): the slide uses the full width and the page scrolls
+  const scale = document.body.classList.contains("simple") && box.id === "slidebox" ? Math.max(0.1, (p.clientWidth - 12) / W) : Math.max(0.1, Math.min(pw / W, ph / H));
   box.style.width = W * scale + "px"; box.style.height = H * scale + "px";
 }
 

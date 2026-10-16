@@ -28,7 +28,7 @@ function roomSlug(s) {
   LANG = linkLang === "en" || linkLang === "ru" ? linkLang : saved.lang || "ru";
   // a link means "student", unless it is this teacher's own room
   let role = linkRoom && !(saved.role === "teacher" && store.get("ls-room", "") === linkRoom) ? "student" : saved.role || null;
-  const paint = () => {
+  let paint = () => {
     $("s-sub").textContent = tr("sub"); $("s-teacher").textContent = tr("teacher"); $("s-teacher-d").textContent = tr("teacherD");
     $("s-student").textContent = tr("student"); $("s-student-d").textContent = tr("studentD");
     $("s-room-l").textContent = tr("roomCode"); $("s-room-box").classList.toggle("hidden", role !== "student" || !!linkRoom);
@@ -51,8 +51,36 @@ function roomSlug(s) {
     $("start").classList.add("hidden"); $("app").classList.remove("hidden");
     init();
   };
+  // phones opening a lesson link get the simple start screen
+  const phone = matchMedia("(max-width: 760px)").matches || /Android|iPhone|iPod/i.test(navigator.userAgent);
+  App.phone = phone;
+  if (linkRoom && role === "student" && phone) {
+    document.body.classList.add("simplestart");
+    const p0 = paint; paint = () => { p0(); $("s-name-l").textContent = tr("whatName"); $("s-go").textContent = tr("enterLesson"); };
+  }
   paint();
+  // came back to the same lesson link: go straight in
+  if (linkRoom && role === "student" && saved.role === "student" && saved.name && saved.room === linkRoom) $("s-go").click();
 })();
+
+// big-button layout for students on phones
+function simpleMode() {
+  document.body.classList.remove("simplestart"); document.body.classList.add("simple");
+  App.live.follow = true; Live.autoTr = true;
+  $("sb-call").onclick = () => Call.toggle();
+  $("sb-chat").onclick = () => { document.body.classList.toggle("chatopen"); Live.unread = 0; simpleLabels(); if (document.body.classList.contains("chatopen")) setTimeout(() => $("chatin")?.focus(), 50); };
+  const readBtn = { set textContent(v) { $("sb-read").textContent = v === "⏹" ? "⏹ " + tr("stop") : "🔊 " + tr("sbRead"); } };
+  $("sb-read").onclick = () => Speak.read(studentSlide(), Live.texts, readBtn);
+  simpleLabels();
+}
+function simpleLabels() {
+  if (!document.body.classList.contains("simple")) return;
+  $("sb-call").textContent = Call.local ? "✖ " + tr("hangUp") : "📞 " + tr("sbCall");
+  $("sb-call").classList.toggle("end", !!Call.local);
+  const open = document.body.classList.contains("chatopen");
+  $("sb-chat").innerHTML = (open ? "⬅ " + tr("sbBack") : "💬 " + tr("chat")) + (Live.unread && !open ? `<span class="dot">${Live.unread}</span>` : "");
+  if (!Speak.on) $("sb-read").textContent = "🔊 " + tr("sbRead");
+}
 
 // teacher: pick a different link name, e.g. /grandma-lessons
 function changeRoom() {
@@ -84,6 +112,7 @@ function init() {
     $("b-calc2").onclick = () => Calc.open(); $("b-call2").onclick = () => Call.toggle(); $("b-translate").onclick = () => Live.translate();
     $("b-speak2").onclick = () => Speak.read(studentSlide(), Live.texts, $("b-speak2"));
     $("b-follow").onclick = () => { App.live.follow = !App.live.follow; if (App.live.follow) App.live.slide = App.live.teacherSlide; renderStudent(); };
+    if (App.phone || new URLSearchParams(location.search).has("simple")) simpleMode();
   }
   relabel();
 }
@@ -92,7 +121,7 @@ function init() {
 function relabel() {
   document.documentElement.lang = LANG;
   $("b-speak") && ($("b-speak").title = tr("readAloud")); $("b-speak2") && ($("b-speak2").title = tr("readAloud"));
-  Call.buttons();
+  Call.buttons(); simpleLabels();
   $("h-who").textContent = (App.role === "teacher" ? "🎓 " + tr("teacherRole") : "🙋 " + tr("studentRole")) + ": " + App.name;
   setConn(Net.open);
   if (App.role === "teacher") {

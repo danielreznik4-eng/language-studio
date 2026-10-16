@@ -71,6 +71,8 @@ const Call = {
   },
   hangUp() {
     Diag.log("call-hangup", {}); Diag.send("hang up", true); Relay.stopAll();
+    // don't ring again for the call I just left
+    this.rangFor = App.people.filter(p => p.inCall && p.id !== App.myId).map(p => p.id).sort().join(",");
     Net.send({ type: "call-leave" });
     for (const id of [...this.peers.keys()]) this.close(id);
     if (this.local) this.local.getTracks().forEach(t => t.stop());
@@ -134,7 +136,8 @@ const Call = {
   checkOngoing() {
     const others = App.people.filter(p => p.inCall && p.id !== App.myId);
     for (const id of ["b-call", "b-call2"]) { const b = $(id); if (b && !this.local) b.style.boxShadow = others.length ? "0 0 0 3px var(--good)" : ""; }
-    if (this.local || !others.length) { this.rangFor = null; if (!others.length) this.stopRing(); return; }
+    if (!others.length) { this.rangFor = null; this.stopRing(); return; }   // call over: next call rings again
+    if (this.local) return;
     const key = others.map(p => p.id).sort().join(",");
     if (this.rangFor === key) return;   // already rang (or declined) for this call
     this.rangFor = key;
@@ -154,7 +157,7 @@ const Call = {
         <button class="btn danger" id="ring-no" style="font-size:20px;padding:14px 20px">✖</button></div></div>`;
     document.body.appendChild(o);
     $("ring-yes").onclick = () => this.join();
-    $("ring-no").onclick = () => { Diag.log("incoming-declined", {}); this.stopRing(); };
+    $("ring-no").onclick = () => { Diag.log("incoming-declined", {}); this.stopRing(); };   // rangFor stays set: no re-ring for this call
     // ringtone (allowed once the page has been touched; silent otherwise)
     try {
       const ac = new AudioContext(); this.ringAudio = ac;
@@ -226,9 +229,23 @@ const Call = {
       <button class="btn small ghost" id="cw-mic"></button><button class="btn small ghost" id="cw-cam"></button>
       <button class="btn small ghost" id="cw-big" title="${esc(tr("bigger"))}">⤢</button><button class="btn small ghost" id="cw-log" title="${esc(tr("sendReport"))}">📋</button><button class="btn small danger" id="cw-end">${tr("hangUp")}</button></span></div>
       <div id="cw-devs" class="row" style="padding:6px 6px 0;flex-wrap:nowrap"></div>
-      <div id="cw-tiles" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));grid-gap:6px;padding:6px"></div>`;
+      <div id="cw-tiles" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));grid-gap:6px;padding:6px"></div>
+      <div id="cw-big-controls">
+        <div><button id="cb-mic"></button><small>${tr("microphone")}</small></div>
+        <div><button id="cb-cam"></button><small>${tr("camera")}</small></div>
+        <div><button id="cb-min">⬇</button><small>${tr("toLesson")}</small></div>
+        <div><button id="cb-end">📞</button><small>${tr("hangUp")}</small></div></div>`;
+    if (document.body.classList.contains("simple")) w.classList.add("full");
     document.body.appendChild(w); draggable(w);
-    const paint = () => { $("cw-mic").textContent = this.micOn ? "🎤" : "🔇"; $("cw-cam").textContent = this.camOn ? "📷" : "🚫📷"; };
+    const paint = () => {
+      $("cw-mic").textContent = $("cb-mic").textContent = this.micOn ? "🎤" : "🔇";
+      $("cw-cam").textContent = this.camOn ? "📷" : "🚫📷"; $("cb-cam").textContent = this.camOn ? "📷" : "🚫";
+      $("cb-mic").style.background = this.micOn ? "#333" : "#d64545"; $("cb-cam").style.background = this.camOn ? "#333" : "#d64545";
+    };
+    $("cb-mic").onclick = () => $("cw-mic").click(); $("cb-cam").onclick = () => $("cw-cam").click(); $("cb-end").onclick = () => this.hangUp();
+    // shrink to a small window to look at the lesson; tap the small window to make it big again
+    $("cb-min").onclick = () => { w.classList.remove("full"); w.querySelector(".fh").style.display = ""; };
+    w.addEventListener("click", e => { if (document.body.classList.contains("simple") && !w.classList.contains("full") && e.target.closest("#cw-tiles")) w.classList.add("full"); });
     $("cw-mic").onclick = () => { this.micOn = !this.micOn; this.local.getAudioTracks().forEach(t => t.enabled = this.micOn); paint(); };
     $("cw-cam").onclick = () => { this.camOn = !this.camOn; this.local.getVideoTracks().forEach(t => t.enabled = this.camOn); paint(); };
     $("cw-big").onclick = () => { const big = w.style.width.startsWith("min(420"); w.style.width = big ? "min(900px, 96vw)" : "min(420px, 92vw)"; };
@@ -256,6 +273,7 @@ const Call = {
     for (const id of Relay.inn.keys()) this.badge(id, "🔒🔁 relay 443");
   },
   buttons() {
+    if (typeof simpleLabels === "function") simpleLabels();
     for (const id of ["b-call", "b-call2"]) { const b = $(id); if (b) { b.textContent = this.local ? tr("hangUp") : tr("videoCallBtn"); b.classList.toggle("danger", !!this.local); b.classList.toggle("ghost", !this.local); } }
   },
 };

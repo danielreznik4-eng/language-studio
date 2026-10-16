@@ -103,6 +103,57 @@ video#remote{width:100%;border-radius:10px;background:#000}
 #present .pbar:hover{opacity:1}
 .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#222;color:#fff;padding:8px 14px;border-radius:9px;z-index:60}
 .textedit{position:absolute;z-index:5;border:2px dashed var(--acc);background:#fffe;color:#000;resize:both;padding:4px;outline:none;font-family:"Segoe UI",sans-serif}
+/* ---------- simple mode: students on phones (big, calm, few buttons) ---------- */
+body.simple{font-size:18px}
+body.simple header{padding:10px 12px;gap:8px}
+body.simple header h1,body.simple #h-conn,body.simple #h-student,body.simple #h-lang,body.simple .tabs,body.simple #toolbar{display:none!important}
+body.simple #h-who{font-size:18px;font-weight:700;color:var(--ink)}
+body.simple #app{grid-template-rows:auto 1fr;padding-bottom:calc(84px + env(safe-area-inset-bottom, 0px))}
+body.simple .main{grid-template-columns:1fr!important}
+body.simple .main>aside.side{display:none!important}
+body.simple .stage{padding:6px;align-items:flex-start;flex:0 0 auto;min-height:0}
+body.simple .center{overflow-y:auto}
+body.simple .question{font-size:20px;padding:12px}
+body.simple .question .opt{font-size:22px;padding:16px 18px;border-radius:14px;margin:10px 0}
+body.simple .question input{font-size:22px;padding:14px}
+body.simple .question .btn{font-size:20px;padding:14px 20px}
+#simplebar{display:none}
+body.simple #simplebar{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:60;gap:8px;background:var(--panel);border-top:1px solid var(--line);
+  padding:10px max(10px, env(safe-area-inset-right, 0px)) calc(10px + env(safe-area-inset-bottom, 0px)) max(10px, env(safe-area-inset-left, 0px))}
+#simplebar button{flex:1;border:0;border-radius:16px;font-size:19px;font-weight:700;padding:14px 6px;background:var(--chip);color:var(--ink);position:relative}
+#simplebar #sb-call{background:var(--good);color:#fff}
+#simplebar #sb-call.end{background:var(--bad)}
+#simplebar .dot{position:absolute;top:6px;right:10px;min-width:22px;height:22px;border-radius:11px;background:var(--bad);color:#fff;font-size:14px;line-height:22px}
+/* chat as a full page */
+body.simple.chatopen .main>aside.side{display:flex!important;position:fixed;top:0;left:0;right:0;bottom:calc(84px + env(safe-area-inset-bottom, 0px));z-index:55;background:var(--panel);font-size:20px;padding:12px}
+body.simple.chatopen .peoplepanel{display:none}
+body.simple .msg{font-size:20px;padding:10px 12px}
+body.simple .chatin input{font-size:20px;padding:14px}
+body.simple .chatin .btn{font-size:22px;padding:0 20px}
+/* start screen on phones */
+body.simplestart .startcard{font-size:20px;padding:22px 18px}
+body.simplestart .startcard h1{font-size:28px}
+body.simplestart .roles,body.simplestart #s-lang,body.simplestart #s-lang-l,body.simplestart #s-english,body.simplestart #s-sub{display:none!important}
+body.simplestart #s-name{font-size:24px;padding:14px}
+body.simplestart #s-go{width:100%;font-size:24px;padding:16px;border-radius:14px}
+/* full-screen call on phones */
+#callwin.full{top:0!important;left:0!important;right:0!important;bottom:0!important;width:auto!important;border-radius:0;background:#000;display:flex;flex-direction:column}
+#callwin.full .fh{display:none}
+#callwin.full #cw-devs{display:none}
+#callwin.full #cw-tiles{flex:1;display:block!important;position:relative;padding:0}
+#callwin.full #cw-tiles>div{position:absolute!important;top:0;left:0;right:0;bottom:0;height:auto!important;padding:0!important;border-radius:0!important}
+#callwin.full #cw-tiles>#tile-me{top:auto;left:auto;right:12px;bottom:12px;width:30%;max-width:180px;height:0!important;padding-bottom:40%!important;border-radius:12px!important;z-index:2;border:2px solid #fff}
+#callwin.full #cw-tiles video{object-fit:contain!important}
+#callwin.full #tile-me video{object-fit:cover!important}
+#cw-big-controls{display:none}
+body.simple #callwin:not(.full){bottom:calc(92px + env(safe-area-inset-bottom, 0px))!important;left:auto!important;right:8px!important;width:min(240px, 62vw)!important}
+body.simple #callwin:not(.full) #cw-devs,body.simple #callwin:not(.full) #cw-mic,body.simple #callwin:not(.full) #cw-cam,body.simple #callwin:not(.full) #cw-big,body.simple #callwin:not(.full) #cw-log{display:none}
+body.simple #callwin:not(.full) #cw-tiles{grid-template-columns:1fr!important}
+body.simple #callwin:not(.full) #cw-tiles>#tile-me{display:none}
+#callwin.full #cw-big-controls{display:flex;justify-content:space-around;padding:14px 10px calc(14px + env(safe-area-inset-bottom, 0px));background:#000}
+#cw-big-controls button{width:68px;height:68px;border-radius:34px;border:0;font-size:28px;background:#333;color:#fff}
+#cw-big-controls #cb-end{background:#d64545}
+#cw-big-controls small{display:block;color:#ccc;font-size:12px;text-align:center;margin-top:4px}
 </style>
 </head>
 <body>
@@ -165,6 +216,7 @@ video#remote{width:100%;border-radius:10px;background:#000}
   </div>
 </div>
 
+<div id="simplebar"><button id="sb-call"></button><button id="sb-chat"></button><button id="sb-read"></button></div>
 <div id="calc" class="float hidden"></div>
 <div id="cad" class="hidden"></div>
 <div id="present" class="hidden"></div>

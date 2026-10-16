@@ -37,6 +37,7 @@ const Live = {
   bind() {
     Net.on("welcome", m => {
       App.myId = m.id; this.chat = m.state.chat || []; App.room = m.room;
+      if (Call.local) { Diag.log("reconnected-in-call", {}); Net.send({ type: "call-join" }); }   // after a reconnect, tell the room I'm still in the call
       if (App.role === "teacher") store.set("ls-room", m.room);
       history.replaceState(null, "", "/" + m.room);
       if (App.role === "teacher") { this.pushLesson(); }
@@ -59,7 +60,10 @@ const Live = {
       (App.answers[sid] = App.answers[sid] || {})[m.from] = { name: m.name, value: m.value };
       renderSide(); toast("✉ " + m.name);
     });
-    Net.on("chat", m => { this.chat.push(m.line); if (this.chat.length > 200) this.chat.shift(); this.drawChat(); if (m.line.from !== App.myId) beep(); });
+    Net.on("chat", m => {
+      this.chat.push(m.line); if (this.chat.length > 200) this.chat.shift(); this.drawChat();
+      if (m.line.from !== App.myId) { beep(); if (!document.body.classList.contains("chatopen")) { this.unread = (this.unread || 0) + 1; simpleLabels(); } }
+    });
     Net.on("pointer", m => { this.pointer = m.on ? [m.x, m.y] : null; drawPointer(); });
     Net.on("rtc", m => m.data?.kind === "call" ? Call.signal(m.from, m.data) : this.signal(m.from, m.data));
     Net.on("call-join", m => Call.onJoin(m.from, m.name));
@@ -165,7 +169,7 @@ function beep() {
 // ---------------------------------------------------------------- side panel (both roles)
 function renderSide() {
   const side = $("side"); if (!side || !App.role) return;
-  const people = `<div class="panel"><h3>👥 ${tr("people")}</h3><div class="people">${App.people.map(p =>
+  const people = `<div class="panel peoplepanel"><h3>👥 ${tr("people")}</h3><div class="people">${App.people.map(p =>
     `<div class="person"><span>${p.role === "teacher" ? "🎓" : "🙋"} ${esc(p.name)}${p.id === App.myId ? " ✦" : ""}</span><span class="muted">${p.lang === "ru" ? "RU" : "EN"}</span></div>`).join("")}</div></div>`;
   if (App.role === "teacher") {
     const s = slide(), ans = App.answers[s?.id] || {}, q = s?.question;
