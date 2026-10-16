@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson Studio</title>
+<style>
+:root{--bg:#eef1f6;--panel:#fff;--ink:#1c2230;--muted:#6a7386;--line:#dce1ea;--acc:#3b6cf0;--acc2:#e7eeff;--good:#1f9d55;--bad:#d64545;--chip:#f3f5f9}
+@media (prefers-color-scheme:dark){:root{--bg:#11141b;--panel:#1a1f29;--ink:#e6e9f0;--muted:#98a1b3;--line:#2b3240;--acc:#6b95ff;--acc2:#22304d;--good:#4cc27a;--bad:#ff7070;--chip:#232a37}}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 "Segoe UI",system-ui,sans-serif;overflow:hidden}
+button,input,select,textarea{font:inherit;color:inherit}
+.btn{border:0;background:var(--acc);color:#fff;padding:7px 12px;border-radius:8px;cursor:pointer;white-space:nowrap}
+.btn.ghost{background:var(--chip);color:var(--ink)} .btn.danger{background:var(--bad)} .btn.small{padding:4px 8px;font-size:13px}
+.btn:disabled{opacity:.5;cursor:default}
+input[type=text],input[type=number],select,textarea{background:var(--chip);border:1px solid var(--line);border-radius:7px;padding:6px 8px}
+.muted{color:var(--muted)}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.hidden{display:none!important}
+/* start screen */
+#start{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto}
+.startcard{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:24px;max-width:640px;width:100%}
+.startcard h1{margin:0 0 4px}
+.roles{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0}
+@media (max-width:560px){.roles{grid-template-columns:1fr}}
+.role{border:2px solid var(--line);border-radius:14px;padding:16px;cursor:pointer;background:var(--chip);text-align:left}
+.role.on{border-color:var(--acc);background:var(--acc2)}
+.role b{font-size:17px;display:block;margin-bottom:4px}
+label.f{display:block;font-weight:600;margin:10px 0 4px}
+/* app shell */
+#app{display:grid;grid-template-rows:auto auto 1fr;height:100%}
+header{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
+header h1{font-size:16px;margin:0}
+.spacer{flex:1}
+.tabs{display:flex;gap:2px;padding:6px 8px 0;background:var(--bg);overflow-x:auto}
+.tab{display:flex;align-items:center;gap:6px;padding:7px 10px;border-radius:9px 9px 0 0;background:var(--chip);cursor:pointer;max-width:200px;border:1px solid var(--line);border-bottom:0}
+.tab.on{background:var(--panel)}
+.tab span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tab .x{border:0;background:none;cursor:pointer;color:var(--muted);padding:0 2px}
+.main{display:grid;grid-template-columns:150px 1fr 260px;min-height:0;background:var(--panel)}
+.main.student{grid-template-columns:1fr 300px}
+@media (max-width:900px){.main{grid-template-columns:1fr}.main>aside{display:none}.main.student>aside.side{display:flex}}
+.main>*{min-width:0}
+aside{border-right:1px solid var(--line);overflow-y:auto;overflow-x:hidden;padding:8px;min-height:0}
+.toolbar{min-width:0}
+aside.side{border-right:0;border-left:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
+.thumbs{display:flex;flex-direction:column;gap:8px}
+.thumb{border:2px solid var(--line);border-radius:8px;cursor:pointer;background:#fff;position:relative;aspect-ratio:16/9;overflow:hidden}
+.thumb.on{border-color:var(--acc)}
+.thumb .n{position:absolute;left:4px;top:2px;font-size:11px;color:#556;background:#fff9;border-radius:4px;padding:0 4px}
+.thumb svg{width:100%;height:100%;display:block}
+.center{display:flex;flex-direction:column;min-width:0;min-height:0}
+.toolbar{display:flex;gap:4px;padding:6px 8px;border-bottom:1px solid var(--line);flex-wrap:wrap;align-items:center}
+.tool{border:1px solid var(--line);background:var(--chip);border-radius:7px;padding:5px 8px;cursor:pointer;min-width:34px}
+.tool.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+.sep{width:1px;height:24px;background:var(--line);margin:0 4px}
+.stage{flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;background:var(--bg);position:relative;min-height:0}
+.slidebox{position:relative;box-shadow:0 4px 20px rgba(0,0,0,.18)}
+.slidebox svg{display:block;width:100%;height:100%;touch-action:none}
+.question{padding:10px 12px;border-top:1px solid var(--line);background:var(--panel)}
+.panel h3{margin:6px 0;font-size:13px;text-transform:uppercase;color:var(--muted);letter-spacing:.4px}
+.props label{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:5px 0}
+.props input[type=color]{width:44px;height:28px;border:0;background:none;padding:0}
+.chat{display:flex;flex-direction:column;min-height:200px;flex:1;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.chatlog{flex:1;overflow:auto;padding:8px;display:flex;flex-direction:column;gap:6px;min-height:120px}
+.msg{background:var(--chip);border-radius:8px;padding:5px 8px}
+.msg b{font-size:12px}
+.msg.me{background:var(--acc2)}
+.chatin{display:flex;border-top:1px solid var(--line)}
+.chatin input{flex:1;border:0;border-radius:0}
+.people{display:flex;flex-direction:column;gap:4px}
+.person{display:flex;justify-content:space-between;background:var(--chip);border-radius:7px;padding:4px 8px}
+.answers{display:flex;flex-direction:column;gap:4px;max-height:220px;overflow:auto}
+.ans{background:var(--chip);border-radius:7px;padding:4px 8px}
+.ans.ok{box-shadow:inset 3px 0 var(--good)} .ans.no{box-shadow:inset 3px 0 var(--bad)}
+.opt{display:block;width:100%;text-align:left;border:1px solid var(--line);background:var(--chip);border-radius:9px;padding:9px 12px;margin:5px 0;cursor:pointer}
+.opt.picked{background:var(--acc);color:#fff}
+video#remote{width:100%;border-radius:10px;background:#000}
+.float{position:fixed;z-index:30;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+.float .fh{display:flex;justify-content:space-between;align-items:center;padding:6px 10px;border-bottom:1px solid var(--line);cursor:move;user-select:none}
+/* calculator */
+#calc{width:280px;right:20px;top:120px}
+.cdisp{margin:8px;padding:8px;background:var(--chip);border-radius:8px;text-align:right;min-height:58px;word-break:break-all}
+.cdisp .expr{color:var(--muted);font-size:13px;min-height:18px}
+.cdisp .res{font-size:24px;font-weight:600}
+.ckeys{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;padding:0 8px 8px}
+.ckeys button{padding:9px 0;border:1px solid var(--line);background:var(--chip);border-radius:7px;cursor:pointer}
+.ckeys button.op{background:var(--acc2)} .ckeys button.eq{background:var(--acc);color:#fff}
+/* CAD */
+#cad{position:fixed;inset:0;z-index:25;background:var(--panel);display:grid;grid-template-rows:auto 1fr}
+#cadview{position:relative;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 290px}
+#cadside{overflow-x:hidden}
+#cad3d{position:relative;min-height:0}
+#cad3d canvas{display:block;width:100%;height:100%}
+#sketch{position:absolute;inset:0;background:rgba(255,255,255,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px}
+@media (prefers-color-scheme:dark){#sketch{background:rgba(20,24,32,.95)}}
+#sketch canvas{background:#fff;border:1px solid var(--line);border-radius:8px;cursor:crosshair}
+/* present mode */
+#present{position:fixed;inset:0;z-index:40;background:#000;display:flex;align-items:center;justify-content:center}
+#present .slidebox{box-shadow:none}
+#present .pbar{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;gap:6px;opacity:.15;transition:opacity .2s}
+#present .pbar:hover{opacity:1}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#222;color:#fff;padding:8px 14px;border-radius:9px;z-index:60}
+.textedit{position:absolute;z-index:5;border:2px dashed var(--acc);background:#fffe;color:#000;resize:both;padding:4px;outline:none;font-family:"Segoe UI",sans-serif}
+</style>
+</head>
+<body>
+<!-- start: who are you -->
+<div id="start">
+  <div class="startcard">
+    <h1>🎓 Lesson Studio</h1>
+    <p class="muted" id="s-sub"></p>
+    <div class="roles">
+      <button class="role" data-role="teacher"><b id="s-teacher"></b><span class="muted" id="s-teacher-d"></span></button>
+      <button class="role" data-role="student"><b id="s-student"></b><span class="muted" id="s-student-d"></span></button>
+    </div>
+    <div id="s-room-box" class="hidden"><label class="f" id="s-room-l"></label><input type="text" id="s-room" maxlength="8" style="width:100%;text-transform:uppercase;letter-spacing:3px;font-weight:700" autocomplete="off"></div>
+    <label class="f" id="s-name-l"></label><input type="text" id="s-name" maxlength="30" style="width:100%">
+    <label class="f" id="s-lang-l"></label>
+    <select id="s-lang" style="width:100%"><option value="en">English</option><option value="ru">Русский</option></select>
+    <div class="row" style="margin-top:16px"><button class="btn" id="s-go" disabled></button><span class="spacer"></span><a href="/english/" id="s-english" class="btn ghost" style="text-decoration:none">📘 English Coach</a></div>
+    <p class="muted hidden" id="s-err" style="color:var(--bad)"></p>
+  </div>
+</div>
+
+<div id="app" class="hidden">
+  <header>
+    <h1>🎓 Lesson Studio</h1>
+    <span class="muted" id="h-who"></span>
+    <span class="muted" id="h-conn"></span>
+    <div class="spacer"></div>
+    <span id="h-teacher" class="row">
+      <button class="btn ghost" id="b-open"></button>
+      <button class="btn ghost" id="b-save"></button>
+      <button class="btn ghost" id="b-cad">🧊 3D CAD</button>
+      <button class="btn ghost" id="b-calc">🧮</button>
+      <button class="btn ghost" id="b-speak" title="Read aloud">🔊</button>
+      <button class="btn ghost" id="b-call"></button>
+      <button class="btn ghost" id="b-share"></button>
+      <button class="btn" id="b-present"></button>
+    </span>
+    <span id="h-student" class="row">
+      <button class="btn ghost" id="b-call2"></button>
+      <button class="btn ghost" id="b-calc2">🧮</button>
+      <button class="btn ghost" id="b-speak2" title="Read aloud">🔊</button>
+      <button class="btn ghost" id="b-translate"></button>
+      <button class="btn ghost" id="b-follow"></button>
+    </span>
+    <select id="h-lang" title="Language"><option value="en">English</option><option value="ru">Русский</option></select>
+  </header>
+  <div class="tabs" id="tabs"></div>
+  <div class="main" id="main">
+    <aside id="left"><div class="row" style="margin-bottom:8px"><button class="btn small" id="b-addslide">+</button>
+      <button class="btn small ghost" id="b-dupslide">⧉</button><button class="btn small ghost" id="b-upslide">↑</button>
+      <button class="btn small ghost" id="b-downslide">↓</button><button class="btn small ghost" id="b-delslide">🗑</button></div>
+      <div class="thumbs" id="thumbs"></div></aside>
+    <div class="center">
+      <div class="toolbar" id="toolbar"></div>
+      <div class="stage" id="stage"><div class="slidebox" id="slidebox"></div></div>
+      <div class="question" id="qbox"></div>
+    </div>
+    <aside class="side" id="side"></aside>
+  </div>
+</div>
+
+<div id="calc" class="float hidden"></div>
+<div id="cad" class="hidden"></div>
+<div id="present" class="hidden"></div>
+<input type="file" id="imgfile" accept="image/*" class="hidden">
+
+<script src="i18n.js"></script>
+<script src="core.js"></script>
+<script src="slides.js"></script>
+<script src="math.js"></script>
+<script src="tts.js"></script>
+<script src="calc.js"></script>
+<script src="cad.js"></script>
+<script src="live.js"></script>
+<script src="call.js"></script>
+<script src="main.js"></script>
+</body>
+</html>

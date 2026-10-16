@@ -1,0 +1,8 @@
+{
+  "name": "lesson-studio",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Lesson Studio (teacher + student lessons, video call) and English Coach",
+  "scripts": { "start": "node server.js" },
+  "engines": { "node": ">=18" }
+}

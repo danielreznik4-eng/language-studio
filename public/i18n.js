@@ -1,0 +1,78 @@
+// Every label in English and Russian. The teacher and each student pick their own language.
+"use strict";
+const STR = {
+  sub: ["Make lessons with slides, drawings, shapes, 3D models and questions - then teach them live.",
+        "Создавай уроки со слайдами, рисунками, фигурами, 3D-моделями и вопросами — и проводи их вживую."],
+  teacher: ["I'm the teacher", "Я учитель"],
+  teacherD: ["Make lessons and present them slide by slide.", "Создаю уроки и показываю их по слайдам."],
+  student: ["I'm the student", "Я ученик"],
+  studentD: ["Join the lesson, follow the slides and answer.", "Подключаюсь к уроку, смотрю слайды и отвечаю."],
+  roomCode: ["Room code from your teacher", "Код комнаты от учителя"], room: ["Room code", "Код комнаты"],
+  noRoom: ["No lesson with that room code is open. Check the code with your teacher.", "Урока с таким кодом нет. Проверь код у учителя."],
+  shareLink: ["Send this link to your student:", "Отправь эту ссылку ученику:"], copy: ["Copy", "Копировать"], copied: ["Copied ✔", "Скопировано ✔"],
+  name: ["Your name", "Твоё имя"], lang: ["Language for me", "Мой язык"], go: ["Start", "Начать"],
+  open: ["📂 Open", "📂 Открыть"], save: ["💾 Save", "💾 Сохранить"], share: ["🖥 Share screen", "🖥 Показать экран"],
+  stopShare: ["⏹ Stop sharing", "⏹ Остановить показ"], present: ["▶ Present", "▶ Показ"],
+  translate: ["🌐 Translate slide", "🌐 Перевести слайд"], original: ["🌐 Original", "🌐 Оригинал"],
+  follow: ["🔗 Following teacher", "🔗 Слежу за учителем"], free: ["🔓 Browsing freely", "🔓 Смотрю сам"],
+  connected: ["● connected", "● на связи"], offline: ["○ offline - is the server window open?", "○ нет связи — открыто окно сервера?"],
+  teacherRole: ["Teacher", "Учитель"], studentRole: ["Student", "Ученик"],
+  newLesson: ["New lesson", "Новый урок"], slide: ["Slide", "Слайд"],
+  // tools
+  tSelect: ["Select / move (V)", "Выбрать / двигать (V)"], tText: ["Text (T)", "Текст (T)"], tRect: ["Rectangle (R)", "Прямоугольник (R)"],
+  tEllipse: ["Circle / ellipse (O)", "Круг / эллипс (O)"], tLine: ["Line (L)", "Линия (L)"], tArrow: ["Arrow (A)", "Стрелка (A)"],
+  tTri: ["Triangle", "Треугольник"], tStar: ["Star", "Звезда"], tPoly: ["Custom shape: click points, double-click to finish (P)", "Своя фигура: щёлкай точки, двойной щелчок — готово (P)"],
+  tPen: ["Brush (B)", "Кисть (B)"], tErase: ["Eraser: click things to delete (E)", "Ластик: нажми на объект, чтобы удалить (E)"],
+  tImage: ["Picture", "Картинка"], undo: ["Undo (Ctrl+Z)", "Отменить (Ctrl+Z)"], redo: ["Redo (Ctrl+Y)", "Повторить (Ctrl+Y)"],
+  // properties
+  props: ["Properties", "Свойства"], fill: ["Fill", "Заливка"], noFill: ["No fill", "Без заливки"], stroke: ["Outline", "Контур"],
+  width: ["Thickness", "Толщина"], fontSize: ["Text size", "Размер текста"], bold: ["Bold", "Жирный"], opacity: ["Opacity", "Прозрачность"],
+  front: ["To front", "Вперёд"], back: ["To back", "Назад"], del: ["Delete", "Удалить"], dup: ["Duplicate", "Копия"],
+  background: ["Slide background", "Фон слайда"], nothingSel: ["Click something on the slide to change it.", "Нажми на объект на слайде, чтобы изменить его."],
+  // questions
+  question: ["Question for the student", "Вопрос ученику"], qNone: ["No question", "Без вопроса"], qChoice: ["Multiple choice", "Выбор ответа"],
+  qText: ["Type an answer", "Написать ответ"], qNumber: ["Number answer", "Ответ числом"], qPrompt: ["Question", "Вопрос"],
+  qOptions: ["Options (one per line, put * before the right one)", "Варианты (по одному в строке, * перед правильным)"],
+  qAnswer: ["Right answer (optional)", "Правильный ответ (можно не писать)"], send: ["Send answer", "Отправить ответ"],
+  sent: ["Answer sent ✔", "Ответ отправлен ✔"], yourAnswer: ["Your answer", "Твой ответ"],
+  // side panel
+  people: ["In the lesson", "На уроке"], answers: ["Answers to this slide", "Ответы на этот слайд"], noAnswers: ["No answers yet.", "Пока нет ответов."],
+  chat: ["Chat", "Чат"], typeMsg: ["Type a message…", "Напиши сообщение…"], joinInfo: ["Students join at:", "Ученики подключаются по адресу:"],
+  waiting: ["Waiting for the teacher to start the lesson…", "Ждём, когда учитель начнёт урок…"],
+  teacherScreen: ["Teacher's screen", "Экран учителя"],
+  // files
+  lessons: ["Saved lessons", "Сохранённые уроки"], noLessons: ["No saved lessons yet.", "Пока нет сохранённых уроков."],
+  savedOk: ["Saved ✔", "Сохранено ✔"], lessonName: ["Lesson name", "Название урока"], cancel: ["Cancel", "Отмена"],
+  exportFile: ["⬇ Download file", "⬇ Скачать файл"], importFile: ["⬆ Load file", "⬆ Загрузить файл"],
+  // calculator
+  calc: ["Calculator", "Калькулятор"], toSlide: ["Put on slide", "На слайд"],
+  // cad
+  cad: ["3D CAD modeling", "3D-моделирование"], close: ["Close", "Закрыть"], box: ["Box", "Куб"], sphere: ["Sphere", "Шар"],
+  cylinder: ["Cylinder", "Цилиндр"], cone: ["Cone", "Конус"], torus: ["Ring", "Тор"], plane: ["Plate", "Пластина"],
+  sketch: ["✏ Sketch + extrude", "✏ Эскиз + выдавливание"], move: ["Move (W)", "Двигать (W)"], rotate: ["Rotate (E)", "Вращать (E)"],
+  scale: ["Size (R)", "Размер (R)"], color: ["Color", "Цвет"], snap: ["Snap to grid", "Привязка к сетке"], stl: ["Export STL (3D print)", "Экспорт STL (3D-печать)"],
+  toSlide3d: ["➜ Add to slide", "➜ Добавить на слайд"], selected: ["Selected", "Выбрано"], noneSel: ["Click a part to select it.", "Нажми на деталь, чтобы выбрать."],
+  sketchHelp: ["Click points to draw a shape. Double-click or press Enter to finish. Esc to cancel.", "Щёлкай точки, чтобы нарисовать фигуру. Двойной щелчок или Enter — готово. Esc — отмена."],
+  depth: ["Thickness", "Толщина"], extrude: ["Extrude", "Выдавить"], cadNeedsNet: ["3D needs the internet the first time it loads.", "Для 3D нужен интернет при первой загрузке."],
+  tMath: ["Math writing: fractions, powers, roots (double-click to edit)", "Математика: дроби, степени, корни (двойной щелчок — изменить)"],
+  tPie: ["Fraction circle", "Круг-дробь"], tBar: ["Fraction bar", "Полоска-дробь"], tNumline: ["Number line", "Числовая прямая"], tGraph: ["Graph of a function", "График функции"],
+  mathEditor: ["Math editor", "Редактор формул"], mathSrc: ["Formula", "Формула"], update: ["Update", "Обновить"],
+  mathHelp: ["Type: 3/4 = fraction, 2 1/2 = mixed number, x^2 = power, x_1 = small number below, sqrt(x) = root, (a+b)/c = big fraction, * = ×, pi = π, <= >= != for ≤ ≥ ≠.",
+    "Пиши: 3/4 — дробь, 2 1/2 — смешанное число, x^2 — степень, x_1 — индекс, sqrt(x) — корень, (a+b)/c — большая дробь, * — ×, pi — π, <= >= != — ≤ ≥ ≠."],
+  parts: ["Parts", "Частей"], shaded: ["Shaded", "Закрашено"], showLabel: ["Show the fraction", "Показать дробь"],
+  from: ["From", "От"], to: ["To", "До"], stepBy: ["Step (can be 1/4)", "Шаг (можно 1/4)"], asFractions: ["Labels as fractions", "Подписи дробями"],
+  dots: ["Dots at", "Точки на"], functions: ["Functions (one per line, like x^2 or 2x+1)", "Функции (по одной в строке, например x^2 или 2x+1)"],
+  fracMode: ["Show answers as fractions", "Показывать ответ дробью"], readAloud: ["Read the slide aloud", "Прочитать слайд вслух"],
+  videoCall: ["Video call", "Видеозвонок"], videoCallBtn: ["📞 Video call", "📞 Видеозвонок"], hangUp: ["Hang up", "Завершить"], you: ["You", "Ты"],
+  bigger: ["Bigger / smaller", "Больше / меньше"], callStarted: ["started a video call - press 📞 to join", "начал(а) видеозвонок — нажми 📞, чтобы присоединиться"],
+  callNoDevices: ["No camera or microphone found, or access was blocked. Allow them in the browser (the icon next to the address).", "Камера или микрофон не найдены, или доступ запрещён. Разреши их в браузере (значок рядом с адресом)."],
+  callNeedsHttps: ["Video calls need the online (https) link. On home Wi-Fi addresses the browser blocks the camera.", "Для видеозвонка нужна онлайн-ссылка (https). По домашнему адресу браузер блокирует камеру."],
+  open3d: ["🧊 Turn the 3D model", "🧊 Вращать 3D-модель"],
+  // present
+  exitPresent: ["Exit (Esc)", "Выход (Esc)"], laser: ["Laser pointer", "Лазерная указка"],
+  shareNote: ["Sharing your screen with students in the app. For Discord, use Present and share in Discord.", "Экран показывается ученикам в приложении. Для Discord нажми «Показ» и покажи экран в Discord."],
+  translating: ["Translating…", "Перевожу…"], translateFail: ["Translation needs the internet.", "Для перевода нужен интернет."],
+  confirmDelSlide: ["Delete this slide?", "Удалить этот слайд?"], confirmClose: ["Close this lesson? Unsaved changes will be lost.", "Закрыть урок? Несохранённые изменения пропадут."],
+};
+let LANG = "en";
+function tr(key) { const s = STR[key]; return s ? s[LANG === "ru" ? 1 : 0] : key; }
