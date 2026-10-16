@@ -67,19 +67,21 @@ function roomSlug(s) {
 function simpleMode() {
   document.body.classList.remove("simplestart"); document.body.classList.add("simple");
   App.live.follow = true; Live.autoTr = true;
-  $("sb-call").onclick = () => Call.toggle();
+  $("sb-call").onclick = () => Call.toggle(); $("sb-eng").onclick = () => EngLessons.open();
   $("sb-chat").onclick = () => { document.body.classList.toggle("chatopen"); Live.unread = 0; simpleLabels(); if (document.body.classList.contains("chatopen")) setTimeout(() => $("chatin")?.focus(), 50); };
-  const readBtn = { set textContent(v) { $("sb-read").textContent = v === "⏹" ? "⏹ " + tr("stop") : "🔊 " + tr("sbRead"); } };
+  const readBtn = { set textContent(v) { $("sb-read").innerHTML = v === "⏹" ? `<span class="ic">⏹</span>${tr("stop")}` : `<span class="ic">🔊</span>${tr("sbRead")}`; } };
   $("sb-read").onclick = () => Speak.read(studentSlide(), Live.texts, readBtn);
   simpleLabels();
 }
 function simpleLabels() {
   if (!document.body.classList.contains("simple")) return;
-  $("sb-call").textContent = Call.local ? "✖ " + tr("hangUp") : "📞 " + tr("sbCall");
+  const lab = (ic, text) => `<span class="ic">${ic}</span>${text}`;
+  $("sb-call").innerHTML = Call.local ? lab("✖", tr("hangUp")) : lab("📞", tr("sbCall"));
   $("sb-call").classList.toggle("end", !!Call.local);
   const open = document.body.classList.contains("chatopen");
-  $("sb-chat").innerHTML = (open ? "⬅ " + tr("sbBack") : "💬 " + tr("chat")) + (Live.unread && !open ? `<span class="dot">${Live.unread}</span>` : "");
-  if (!Speak.on) $("sb-read").textContent = "🔊 " + tr("sbRead");
+  $("sb-chat").innerHTML = (open ? lab("⬅", tr("sbBack")) : lab("💬", tr("chat"))) + (Live.unread && !open ? `<span class="dot">${Live.unread}</span>` : "");
+  if (!Speak.on) $("sb-read").innerHTML = lab("🔊", tr("sbRead"));
+  $("sb-eng").innerHTML = lab("📘", tr("sbEnglish"));
 }
 
 // teacher: pick a different link name, e.g. /grandma-lessons
@@ -109,7 +111,7 @@ function init() {
     }).catch(() => {});
   } else {
     $("h-teacher").classList.add("hidden"); $("left").classList.add("hidden"); $("main").classList.add("student");
-    $("b-calc2").onclick = () => Calc.open(); $("b-call2").onclick = () => Call.toggle(); $("b-translate").onclick = () => Live.translate();
+    $("b-calc2").onclick = () => Calc.open(); $("b-call2").onclick = () => Call.toggle(); $("b-eng2").onclick = () => EngLessons.open(); $("b-translate").onclick = () => Live.translate();
     $("b-speak2").onclick = () => Speak.read(studentSlide(), Live.texts, $("b-speak2"));
     $("b-follow").onclick = () => { App.live.follow = !App.live.follow; if (App.live.follow) App.live.slide = App.live.teacherSlide; renderStudent(); };
     if (App.phone || new URLSearchParams(location.search).has("simple")) simpleMode();
@@ -129,7 +131,7 @@ function relabel() {
     $("b-share").textContent = Live.stream ? tr("stopShare") : tr("share");
     renderToolbar(); renderEditor();
   } else {
-    $("b-translate").textContent = Live.texts ? tr("original") : tr("translate");
+    $("b-translate").textContent = Live.texts ? tr("original") : tr("translate"); $("b-eng2").textContent = "📘 " + tr("engLessons");
     renderStudent(); renderSide();
   }
 }

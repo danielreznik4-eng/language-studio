@@ -120,9 +120,11 @@ body.simple .question .btn{font-size:20px;padding:14px 20px}
 #simplebar{display:none}
 body.simple #simplebar{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:60;gap:8px;background:var(--panel);border-top:1px solid var(--line);
   padding:10px max(10px, env(safe-area-inset-right, 0px)) calc(10px + env(safe-area-inset-bottom, 0px)) max(10px, env(safe-area-inset-left, 0px))}
-#simplebar button{flex:1;border:0;border-radius:16px;font-size:19px;font-weight:700;padding:14px 6px;background:var(--chip);color:var(--ink);position:relative}
+#simplebar button{flex:1;border:0;border-radius:16px;font-size:15px;line-height:1.15;white-space:normal;min-width:0;font-weight:700;padding:14px 6px;background:var(--chip);color:var(--ink);position:relative}
 #simplebar #sb-call{background:var(--good);color:#fff}
 #simplebar #sb-call.end{background:var(--bad)}
+#simplebar .ic{display:block;font-size:26px;margin-bottom:2px}
+body.simple #engapp{bottom:calc(84px + env(safe-area-inset-bottom, 0px))!important}
 #simplebar .dot{position:absolute;top:6px;right:10px;min-width:22px;height:22px;border-radius:11px;background:var(--bad);color:#fff;font-size:14px;line-height:22px}
 /* chat as a full page */
 body.simple.chatopen .main>aside.side{display:flex!important;position:fixed;top:0;left:0;right:0;bottom:calc(84px + env(safe-area-inset-bottom, 0px));z-index:55;background:var(--panel);font-size:20px;padding:12px}
@@ -194,6 +196,7 @@ body.simple #callwin:not(.full) #cw-tiles>#tile-me{display:none}
       <button class="btn" id="b-present"></button>
     </span>
     <span id="h-student" class="row">
+      <button class="btn ghost" id="b-eng2"></button>
       <button class="btn ghost" id="b-call2"></button>
       <button class="btn ghost" id="b-calc2">🧮</button>
       <button class="btn ghost" id="b-speak2" title="Read aloud">🔊</button>
@@ -217,7 +220,7 @@ body.simple #callwin:not(.full) #cw-tiles>#tile-me{display:none}
   </div>
 </div>
 
-<div id="simplebar"><button id="sb-call"></button><button id="sb-chat"></button><button id="sb-read"></button></div>
+<div id="simplebar"><button id="sb-call"></button><button id="sb-chat"></button><button id="sb-eng"></button><button id="sb-read"></button></div>
 <div id="calc" class="float hidden"></div>
 <div id="cad" class="hidden"></div>
 <div id="present" class="hidden"></div>

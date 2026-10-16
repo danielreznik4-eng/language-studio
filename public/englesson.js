@@ -12,8 +12,23 @@ const EngLessons = {
     const a = ALPHABET_RU.find(x => x[0].startsWith(L)); return { big: a[0], name: a[1], text: '"' + a[1] + '" - ' + a[2] + ". " + a[3] + " = " + a[4], say: L + ". " + a[3] };
   },
 
-  // ---------------------------------------------------------------- picker window
+  // ---------------------------------------------------------------- English Coach inside the site (same app as on the PC)
   open() {
+    if (document.getElementById("engapp")) return;
+    const o = document.createElement("div"); o.id = "engapp";
+    o.style.cssText = "position:fixed;top:0;right:0;bottom:0;left:0;z-index:45;background:var(--bg);display:flex;flex-direction:column";
+    o.innerHTML = `<div style="display:flex;gap:8px;align-items:center;padding:8px 12px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap">
+        <b style="font-size:16px">📘 ${tr("engLessons")}</b><span style="flex:1"></span>
+        ${App.role === "teacher" ? `<button class="btn ghost" id="ea-slides">🎨 ${tr("makeSlides")}</button>` : ""}
+        <button class="btn" id="ea-x" style="font-size:16px">✕ ${tr("close")}</button></div>
+      <iframe src="/english/" title="English Coach" style="flex:1;border:0;width:100%;background:var(--bg)" allow="autoplay"></iframe>`;
+    document.body.appendChild(o);
+    $("ea-x").onclick = () => o.remove();
+    const s = $("ea-slides"); if (s) s.onclick = () => { o.remove(); this.picker(); };
+  },
+
+  // ---------------------------------------------------------------- picker: lesson -> slides
+  picker() {
     document.getElementById("engwin")?.remove();
     const w = document.createElement("div"); w.id = "engwin"; w.className = "float";
     Object.assign(w.style, { left: "50%", top: "70px", transform: "translateX(-50%)", width: "min(720px, 96vw)", maxHeight: "80vh", display: "flex", flexDirection: "column" });
