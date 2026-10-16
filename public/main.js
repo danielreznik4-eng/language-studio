@@ -1,23 +1,34 @@
 // Start screen, header buttons, open/save, present mode, language switching.
 "use strict";
+
+// link name for a room: "Даниил Р." -> "daniil-r"
+function roomSlug(s) {
+  const map = { а:"a",б:"b",в:"v",г:"g",д:"d",е:"e",ё:"yo",ж:"zh",з:"z",и:"i",й:"y",к:"k",л:"l",м:"m",н:"n",о:"o",п:"p",р:"r",с:"s",т:"t",у:"u",ф:"f",х:"kh",ц:"ts",ч:"ch",ш:"sh",щ:"shch",ъ:"",ы:"y",ь:"",э:"e",ю:"yu",я:"ya" };
+  return String(s || "").toLowerCase().split("").map(c => map[c] ?? c).join("").replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 32);
+}
+
 (function start() {
   const saved = store.get("ls-me", {});
-  LANG = saved.lang || (navigator.language || "en").slice(0, 2) === "ru" ? (saved.lang || "ru") : (saved.lang || "en");
-  let role = saved.role || null;
+  const qs = new URLSearchParams(location.search);
+  // the room comes from the link: /daniel  (old links: ?room=daniel)
+  const pathRoom = roomSlug(decodeURIComponent(location.pathname.slice(1).replace(/\/$/, "")));
+  const linkRoom = pathRoom || roomSlug(qs.get("room") || "");
+  // Russian unless this person picked English before, or the link says ?lang=en
+  const linkLang = qs.get("lang");
+  LANG = linkLang === "en" || linkLang === "ru" ? linkLang : saved.lang || "ru";
+  // a link means "student", unless it is this teacher's own room
+  let role = linkRoom && !(saved.role === "teacher" && store.get("ls-room", "") === linkRoom) ? "student" : saved.role || null;
   const paint = () => {
     $("s-sub").textContent = tr("sub"); $("s-teacher").textContent = tr("teacher"); $("s-teacher-d").textContent = tr("teacherD");
     $("s-student").textContent = tr("student"); $("s-student-d").textContent = tr("studentD");
-    $("s-room-l").textContent = tr("roomCode"); $("s-room-box").classList.toggle("hidden", role !== "student");
+    $("s-room-l").textContent = tr("roomCode"); $("s-room-box").classList.toggle("hidden", role !== "student" || !!linkRoom);
     $("s-name-l").textContent = tr("name"); $("s-lang-l").textContent = tr("lang"); $("s-go").textContent = tr("go");
     document.querySelectorAll(".role").forEach(b => b.classList.toggle("on", b.dataset.role === role));
-    $("s-go").disabled = !role || !$("s-name").value.trim() || (role === "student" && $("s-room").value.trim().length < 4);
+    $("s-go").disabled = !role || !$("s-name").value.trim() || (role === "student" && roomSlug($("s-room").value).length < 2);
   };
   $("s-name").value = saved.name || ""; $("s-lang").value = LANG;
-  const qs = new URLSearchParams(location.search), linkRoom = (qs.get("room") || "").toUpperCase();
-  const linkLang = qs.get("lang"); if (linkLang === "ru" || linkLang === "en") { LANG = linkLang; $("s-lang").value = LANG; }
-  if (linkRoom && saved.role !== "teacher") role = "student";
-  $("s-room").value = linkRoom || (role === "student" ? saved.room || "" : "");
-  $("s-room").oninput = () => { $("s-room").value = $("s-room").value.toUpperCase(); paint(); };
+  $("s-room").value = linkRoom || (saved.role === "student" ? saved.room || "" : "");
+  $("s-room").oninput = paint;
   let err = ""; try { err = sessionStorage.getItem("ls-err") || ""; sessionStorage.removeItem("ls-err"); } catch (e) { /* none */ }
   if (err) { $("s-err").textContent = err; $("s-err").classList.remove("hidden"); }
   document.querySelectorAll(".role").forEach(b => b.onclick = () => { role = b.dataset.role; paint(); });
@@ -25,7 +36,7 @@
   $("s-lang").onchange = e => { LANG = e.target.value; paint(); };
   $("s-go").onclick = () => {
     App.role = role; App.name = $("s-name").value.trim();
-    App.room = role === "student" ? $("s-room").value.trim().toUpperCase() : (store.get("ls-room", "") || linkRoom);
+    App.room = role === "student" ? roomSlug($("s-room").value) : (store.get("ls-room", "") || roomSlug(App.name));
     store.set("ls-me", { role, name: App.name, lang: LANG, room: role === "student" ? App.room : undefined });
     $("start").classList.add("hidden"); $("app").classList.remove("hidden");
     init();
@@ -33,6 +44,12 @@
   paint();
 })();
 
+// teacher: pick a different link name, e.g. /grandma-lessons
+function changeRoom() {
+  const n = roomSlug(prompt(tr("newLink"), App.room) || "");
+  if (n.length < 2 || n === App.room) return;
+  App.room = n; store.set("ls-room", n); Net.ws?.close();   // reconnects into the new room
+}
 function init() {
   $("h-lang").value = LANG;
   $("h-lang").onchange = e => { LANG = e.target.value; store.set("ls-me", Object.assign(store.get("ls-me", {}), { lang: LANG })); relabel(); };
@@ -49,7 +66,7 @@ function init() {
     fetch("/api/info").then(r => r.json()).then(j => {
       const local = ["localhost", "127.0.0.1"].includes(location.hostname);
       const bases = local ? j.addresses.map(a => "http://" + a + ":" + j.port) : [location.origin];
-      Object.defineProperty(Live, "joinUrls", { configurable: true, get: () => App.room ? bases.flatMap(b => [b + "/?room=" + App.room + "&lang=ru", b + "/?room=" + App.room + "&lang=en"]) : [] });
+      Object.defineProperty(Live, "joinUrls", { configurable: true, get: () => App.room ? bases.map(b => b + "/" + App.room) : [] });
       renderSide();
     }).catch(() => {});
   } else {
@@ -81,7 +98,7 @@ function relabel() {
 // a student typed a room code that has no open lesson: back to the start screen with a message
 function showStartError(msg) {
   try { sessionStorage.setItem("ls-err", msg); } catch (e) { /* none */ }
-  location.href = "/?room=" + encodeURIComponent(App.room);
+  location.href = "/" + encodeURIComponent(App.room);
 }
 
 // ---------------------------------------------------------------- open / save

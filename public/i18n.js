@@ -7,9 +7,10 @@ const STR = {
   teacherD: ["Make lessons and present them slide by slide.", "Создаю уроки и показываю их по слайдам."],
   student: ["I'm the student", "Я ученик"],
   studentD: ["Join the lesson, follow the slides and answer.", "Подключаюсь к уроку, смотрю слайды и отвечаю."],
-  roomCode: ["Room code from your teacher", "Код комнаты от учителя"], room: ["Room code", "Код комнаты"],
+  roomCode: ["Teacher's link name (the part after the /)", "Имя ссылки учителя (часть после /)"], room: ["Lesson link", "Ссылка на урок"],
+  changeLink: ["Change", "Изменить"], newLink: ["New link name (letters, numbers, -)", "Новое имя ссылки (буквы, цифры, -)"],
   noRoom: ["No lesson with that room code is open. Check the code with your teacher.", "Урока с таким кодом нет. Проверь код у учителя."],
-  shareLink: ["Send this link to your student:", "Отправь эту ссылку ученику:"], copy: ["Copy", "Копировать"], copied: ["Copied ✔", "Скопировано ✔"],
+  shareLink: ["Send this link to your student (it opens in Russian):", "Отправь эту ссылку ученику (откроется на русском):"], copy: ["Copy", "Копировать"], copied: ["Copied ✔", "Скопировано ✔"],
   name: ["Your name", "Твоё имя"], lang: ["Language for me", "Мой язык"], go: ["Start", "Начать"],
   open: ["📂 Open", "📂 Открыть"], save: ["💾 Save", "💾 Сохранить"], share: ["🖥 Share screen", "🖥 Показать экран"],
   stopShare: ["⏹ Stop sharing", "⏹ Остановить показ"], present: ["▶ Present", "▶ Показ"],
@@ -38,7 +39,7 @@ const STR = {
   // side panel
   people: ["In the lesson", "На уроке"], answers: ["Answers to this slide", "Ответы на этот слайд"], noAnswers: ["No answers yet.", "Пока нет ответов."],
   chat: ["Chat", "Чат"], typeMsg: ["Type a message…", "Напиши сообщение…"], joinInfo: ["Students join at:", "Ученики подключаются по адресу:"],
-  waiting: ["Waiting for the teacher to start the lesson…", "Ждём, когда учитель начнёт урок…"],
+  waiting: ["Waiting for the teacher… The lesson will appear here by itself.", "Ждём учителя… Урок появится здесь сам."],
   teacherScreen: ["Teacher's screen", "Экран учителя"],
   // files
   lessons: ["Saved lessons", "Сохранённые уроки"], noLessons: ["No saved lessons yet.", "Пока нет сохранённых уроков."],
@@ -66,6 +67,9 @@ const STR = {
   videoCall: ["Video call", "Видеозвонок"], videoCallBtn: ["📞 Video call", "📞 Видеозвонок"], hangUp: ["Hang up", "Завершить"], you: ["You", "Ты"],
   bigger: ["Bigger / smaller", "Больше / меньше"], callStarted: ["started a video call - press 📞 to join", "начал(а) видеозвонок — нажми 📞, чтобы присоединиться"],
   callNoDevices: ["No camera or microphone found, or access was blocked. Allow them in the browser (the icon next to the address).", "Камера или микрофон не найдены, или доступ запрещён. Разреши их в браузере (значок рядом с адресом)."],
+  callBusy: ["The camera is being used by another app (Discord, OBS, Zoom...). Close the camera there and try again.", "Камера занята другой программой (Discord, OBS, Zoom...). Закрой камеру там и попробуй снова."],
+  callBlocked: ["Camera or microphone access is blocked. Click the camera icon next to the address and choose Allow.", "Доступ к камере или микрофону запрещён. Нажми значок камеры рядом с адресом и выбери «Разрешить»."],
+  camera: ["Camera", "Камера"], microphone: ["Microphone", "Микрофон"],
   callNeedsHttps: ["Video calls need the online (https) link. On home Wi-Fi addresses the browser blocks the camera.", "Для видеозвонка нужна онлайн-ссылка (https). По домашнему адресу браузер блокирует камеру."],
   open3d: ["🧊 Turn the 3D model", "🧊 Вращать 3D-модель"],
   // present

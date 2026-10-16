@@ -15,7 +15,7 @@ const Live = {
     Net.on("welcome", m => {
       App.myId = m.id; this.chat = m.state.chat || []; App.room = m.room;
       if (App.role === "teacher") store.set("ls-room", m.room);
-      history.replaceState(null, "", "?room=" + m.room + "&lang=" + LANG);
+      history.replaceState(null, "", "/" + m.room);
       if (App.role === "teacher") { this.pushLesson(); }
       else { App.live.lesson = m.state.lesson; App.live.teacherSlide = m.state.slide; if (App.live.follow) App.live.slide = m.state.slide; renderStudent(); }
       renderSide();
@@ -134,13 +134,14 @@ function renderSide() {
       return q.type === "number" ? (() => { const a = answerValue(v), b = answerValue(q.answer); return a != null && b != null && Math.abs(a - b) < 1e-9; })() : String(v).trim().toLowerCase() === q.answer.trim().toLowerCase();
     };
     side.innerHTML = propsHTML()
-      + `<div class="panel"><h3>🔗 ${tr("room")}: <span style="color:var(--acc);letter-spacing:2px">${esc(App.room || "…")}</span></h3>
-          <div class="muted" style="font-size:12px">${tr("shareLink")}</div>${Live.joinUrls.map(u => `<div class="row"><span class="muted">${u.endsWith("lang=ru") ? "🇷🇺" : "🇬🇧"}</span><b style="word-break:break-all;flex:1">${esc(u)}</b><button class="btn small ghost" data-copy="${esc(u)}">${tr("copy")}</button></div>`).join("") || "<span class='muted'>…</span>"}</div>`
+      + `<div class="panel"><h3>🔗 ${tr("room")}: <span style="color:var(--acc)">/${esc(App.room || "…")}</span> <button class="btn small ghost" id="b-room">${tr("changeLink")}</button></h3>
+          <div class="muted" style="font-size:12px">${tr("shareLink")}</div>${Live.joinUrls.map(u => `<div class="row"><b style="word-break:break-all;flex:1">${esc(u)}</b><button class="btn small ghost" data-copy="${esc(u)}">${tr("copy")}</button></div>`).join("") || "<span class='muted'>…</span>"}</div>`
       + people
       + `<div class="panel"><h3>✉ ${tr("answers")}</h3><div class="answers">${Object.values(ans).map(a => { const ok = right(a.value);
           return `<div class="ans ${ok === true ? "ok" : ok === false ? "no" : ""}"><b>${esc(a.name)}:</b> ${esc(a.value)} ${ok === true ? "✔" : ok === false ? "✖" : ""}</div>`; }).join("") || `<span class="muted">${tr("noAnswers")}</span>`}</div></div>`
       + Live.chatHTML();
     bindProps();
+    const br = $("b-room"); if (br) br.onclick = changeRoom;
     side.querySelectorAll("[data-copy]").forEach(b => b.onclick = () => { navigator.clipboard?.writeText(b.dataset.copy).then(() => toast(tr("copied"))).catch(() => {}); });
   } else {
     side.innerHTML = (Live.remoteStream ? `<div class="panel"><h3>🖥 ${tr("teacherScreen")}</h3><video id="remote" autoplay playsinline controls muted></video></div>` : "")

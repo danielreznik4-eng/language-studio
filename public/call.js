@@ -7,16 +7,74 @@ const Call = {
 
   async toggle() { return this.local ? this.hangUp() : this.join(); },
 
+  // pick devices: the saved choice, else a real camera (virtual cameras usually show only black)
+  async devices() {
+    const all = await navigator.mediaDevices.enumerateDevices();
+    const cams = all.filter(d => d.kind === "videoinput"), mics = all.filter(d => d.kind === "audioinput");
+    const saved = store.get("ls-devices", {});
+    const cam = cams.find(d => d.deviceId === saved.cam) || cams.find(d => !/virtual|obs|snap|xsplit|nvidia broadcast/i.test(d.label)) || cams[0];
+    const mic = mics.find(d => d.deviceId === saved.mic) || mics.find(d => d.deviceId === "default") || mics[0];
+    return { cams, mics, cam: cam?.deviceId, mic: mic?.deviceId };
+  },
+  constraints(camId, micId) {
+    return {
+      video: camId ? { deviceId: { exact: camId }, width: { ideal: 640 }, height: { ideal: 360 } } : { width: { ideal: 640 }, height: { ideal: 360 } },
+      audio: micId ? { deviceId: { exact: micId }, echoCancellation: true, noiseSuppression: true } : { echoCancellation: true, noiseSuppression: true },
+    };
+  },
+  explain(e) {
+    if (location.protocol === "http:" && !["localhost", "127.0.0.1"].includes(location.hostname)) return tr("callNeedsHttps");
+    if (e?.name === "NotReadableError" || e?.name === "TrackStartError") return tr("callBusy");
+    if (e?.name === "NotAllowedError") return tr("callBlocked");
+    return tr("callNoDevices");
+  },
+
   async join() {
-    try { this.local = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 360 }, audio: { echoCancellation: true, noiseSuppression: true } }); }
+    let first;
+    try { first = await navigator.mediaDevices.getUserMedia({ video: true, audio: true }); }   // asks permission once
     catch (e) {
-      try { this.local = await navigator.mediaDevices.getUserMedia({ audio: true }); this.camOn = false; }   // no camera: audio only
-      catch (e2) { toast(location.protocol === "http:" && !["localhost", "127.0.0.1"].includes(location.hostname) ? tr("callNeedsHttps") : tr("callNoDevices"), 5000); this.local = null; return; }
+      try { first = await navigator.mediaDevices.getUserMedia({ audio: true }); toast(this.explain(e), 6000); }   // camera failed: audio only
+      catch (e2) { toast(this.explain(e2), 6000); return; }
+    }
+    // now that labels are visible, switch to the real camera if the browser picked a virtual one
+    const d = await this.devices();
+    const curCam = first.getVideoTracks()[0]?.getSettings().deviceId;
+    this.local = first;
+    if (first.getVideoTracks().length && d.cam && d.cam !== curCam) {
+      try { const better = await navigator.mediaDevices.getUserMedia(this.constraints(d.cam, d.mic)); first.getTracks().forEach(t => t.stop()); this.local = better; } catch (e) { /* keep the first one */ }
     }
     this.micOn = true; this.camOn = this.local.getVideoTracks().length > 0;
-    this.window(); this.tile("me", this.local, tr("you"), true);
+    this.window(); this.tile("me", this.local, tr("you"), true); this.pickers();
     Net.send({ type: "call-join" });
     this.buttons();
+  },
+
+  // camera / microphone dropdowns in the call window; switching replaces the track for everyone
+  async pickers() {
+    const box = $("cw-devs"); if (!box) return;
+    const d = await this.devices();
+    const curCam = this.local.getVideoTracks()[0]?.getSettings().deviceId, curMic = this.local.getAudioTracks()[0]?.getSettings().deviceId;
+    const opt = (list, cur, none) => (list.length ? list : [{ deviceId: "", label: none }]).map((x, i) => `<option value="${esc(x.deviceId)}" ${x.deviceId === cur ? "selected" : ""}>${esc(x.label || none + " " + (i + 1))}</option>`).join("");
+    box.innerHTML = `<select id="cw-cam-sel" title="${esc(tr("camera"))}" style="flex:1;min-width:0">${opt(d.cams, curCam, "📷")}</select>
+      <select id="cw-mic-sel" title="${esc(tr("microphone"))}" style="flex:1;min-width:0">${opt(d.mics, curMic, "🎤")}</select>`;
+    const swap = async (kind, id) => {
+      const saved = store.get("ls-devices", {}); saved[kind === "video" ? "cam" : "mic"] = id; store.set("ls-devices", saved);
+      try {
+        const c = this.constraints(kind === "video" ? id : null, kind === "audio" ? id : null);
+        const s = await navigator.mediaDevices.getUserMedia(kind === "video" ? { video: c.video } : { audio: c.audio });
+        const track = kind === "video" ? s.getVideoTracks()[0] : s.getAudioTracks()[0];
+        const old = kind === "video" ? this.local.getVideoTracks()[0] : this.local.getAudioTracks()[0];
+        if (old) { this.local.removeTrack(old); old.stop(); }
+        this.local.addTrack(track); track.enabled = kind === "video" ? this.camOn : this.micOn;
+        for (const pc of this.peers.values()) {
+          const sender = pc.getSenders().find(x => x.track?.kind === kind || (!x.track && kind === "video"));
+          if (sender) sender.replaceTrack(track); else pc.addTrack(track, this.local);
+        }
+        this.tile("me", this.local, tr("you"), true);
+      } catch (e) { toast(this.explain(e), 6000); }
+    };
+    $("cw-cam-sel").onchange = e => swap("video", e.target.value);
+    $("cw-mic-sel").onchange = e => swap("audio", e.target.value);
   },
 
   hangUp() {
@@ -69,6 +127,7 @@ const Call = {
     w.innerHTML = `<div class="fh"><b>📞 ${tr("videoCall")}</b><span class="row">
       <button class="btn small ghost" id="cw-mic"></button><button class="btn small ghost" id="cw-cam"></button>
       <button class="btn small ghost" id="cw-big" title="${esc(tr("bigger"))}">⤢</button><button class="btn small danger" id="cw-end">${tr("hangUp")}</button></span></div>
+      <div id="cw-devs" class="row" style="padding:6px 6px 0;flex-wrap:nowrap"></div>
       <div id="cw-tiles" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:6px;padding:6px"></div>`;
     document.body.appendChild(w); draggable(w);
     const paint = () => { $("cw-mic").textContent = this.micOn ? "🎤" : "🔇"; $("cw-cam").textContent = this.camOn ? "📷" : "🚫📷"; };
@@ -87,7 +146,9 @@ const Call = {
         <span style="position:absolute;left:6px;bottom:4px;color:#fff;font-size:12px;background:#0008;padding:1px 6px;border-radius:5px">${esc(name)}</span>`;
       box.appendChild(t);
     }
-    t.querySelector("video").srcObject = stream;
+    const v = t.querySelector("video");
+    if (v.srcObject !== stream) v.srcObject = stream;
+    v.play().catch(() => { /* starts after the next click */ });
   },
   buttons() {
     for (const id of ["b-call", "b-call2"]) { const b = $(id); if (b) { b.textContent = this.local ? tr("hangUp") : tr("videoCallBtn"); b.classList.toggle("danger", !!this.local); b.classList.toggle("ghost", !this.local); } }

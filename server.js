@@ -19,9 +19,11 @@ const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; ch
   ".json": "application/json; charset=utf-8", ".png": "image/png", ".svg": "image/svg+xml", ".ico": "image/x-icon" };
 
 const safeName = n => String(n || "").replace(/[^\p{L}\p{N} _.-]/gu, "").trim().slice(0, 80);
-const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";   // no 0/O or 1/I mix-ups
-const cleanCode = c => String(c || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
-const newCode = () => { let c; do { c = Array.from(crypto.randomBytes(6), b => CODE_CHARS[b % CODE_CHARS.length]).join(""); } while (rooms.has(c)); return c; };
+// rooms are simple names used in the link: /daniel, /babushka-lessons
+const RESERVED = new Set(["english", "api", "ws", "index", "public"]);
+const cleanCode = c => String(c || "").toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 32);
+const validRoom = c => c.length >= 2 && !RESERVED.has(c);
+const newCode = () => { let c; do { c = "class-" + crypto.randomBytes(3).toString("hex"); } while (rooms.has(c)); return c; };
 
 function readBody(req, limit, cb) {
   const chunks = []; let size = 0;
@@ -37,7 +39,7 @@ const server = http.createServer((req, res) => {
   const json = (code, obj) => { res.writeHead(code, { "Content-Type": TYPES[".json"] }); res.end(JSON.stringify(obj)); };
   if (url.pathname.startsWith("/api/lessons")) {
     const room = cleanCode(url.searchParams.get("room"));
-    if (room.length < 4) return json(400, { error: "room code needed" });
+    if (!validRoom(room)) return json(400, { error: "room name needed" });
     const dir = lessonDir(room);
     if (url.pathname === "/api/lessons" && req.method === "GET") {
       const list = fs.readdirSync(dir).filter(f => f.endsWith(".json")).map(f => ({ name: f.slice(0, -5), saved: fs.statSync(path.join(dir, f)).mtimeMs }))
@@ -60,6 +62,7 @@ const server = http.createServer((req, res) => {
   let p = url.pathname;
   if (p === "/") p = "/index.html";
   if (p === "/english" || p === "/english/") p = "/english/index.html";
+  else if (/^\/[a-z0-9-]{2,32}\/?$/i.test(p) && validRoom(cleanCode(p))) p = "/index.html";   // /daniel -> the app, joining room "daniel"
   const file = path.normalize(path.join(PUBLIC, decodeURIComponent(p)));
   if (!file.startsWith(PUBLIC) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) { res.writeHead(404); return res.end("not found"); }
   res.writeHead(200, { "Content-Type": TYPES[path.extname(file)] || "application/octet-stream", "Cache-Control": "no-cache" });
@@ -138,8 +141,7 @@ function onMessage(c, msg) {
   if (msg.type === "hello") {
     c.role = msg.role === "teacher" ? "teacher" : "student"; c.name = String(msg.name || "?").slice(0, 30); c.lang = msg.lang;
     let code = cleanCode(msg.room);
-    if (c.role === "student" && (code.length < 4 || !rooms.has(code))) { send(c, { type: "noroom", room: code }); return; }
-    if (c.role === "teacher" && code.length < 4) code = newCode();
+    if (!validRoom(code)) { if (c.role === "student") { send(c, { type: "noroom", room: code }); return; } code = newCode(); }
     if (c.room) leave(c);
     c.room = getRoom(code); c.room.clients.add(c);
     send(c, { type: "welcome", id: c.id, room: code, state: c.room.state });
@@ -193,7 +195,7 @@ function lanAddresses() {
 server.listen(PORT, "0.0.0.0", () => {
   console.log("\n  Lesson Studio is running!\n");
   console.log("  Teacher (this computer):  http://localhost:" + PORT);
-  for (const a of lanAddresses()) console.log("  Student (same Wi-Fi):     http://" + a + ":" + PORT + "  (plus the room code)");
+  for (const a of lanAddresses()) console.log("  Student (same Wi-Fi):     http://" + a + ":" + PORT + "/<teacher-name>");
   console.log("  English Coach:            http://localhost:" + PORT + "/english");
   console.log("\n  Keep this window open while you use the app. Close it to stop.\n");
 });
