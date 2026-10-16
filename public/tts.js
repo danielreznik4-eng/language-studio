@@ -22,6 +22,7 @@ const Speak = {
   phrases(s, texts) {
     if (!s) return [];
     const ru = LANG === "ru", out = [];
+    if (s.say) out.push(s.say);   // listening exercises: the word is spoken but not shown
     const objs = s.objects.filter(o => ["text", "math", "fracpie", "fracbar"].includes(o.type)).slice().sort((a, b) => (a.y - b.y) || (a.x - b.x));
     for (const o of objs) {
       if (o.type === "text") out.push(texts?.[o.id] ?? o.text);

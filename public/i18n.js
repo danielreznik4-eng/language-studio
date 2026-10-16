@@ -77,6 +77,9 @@ const STR = {
   reportSent: ["Report sent ✔", "Отчёт отправлен ✔"], reports: ["Call reports", "Отчёты о звонках"],
   sbCall: ["Call", "Позвонить"], sbRead: ["Read aloud", "Прочитать"], sbBack: ["Back", "Назад"], stop: ["Stop", "Стоп"],
   whatName: ["What is your name?", "Как вас зовут?"], enterLesson: ["Enter the lesson", "Войти на урок"], toLesson: ["Lesson", "Урок"],
+  engLessons: ["English lessons", "Уроки английского"], ru2en: ["Russian speaker learns English", "Учим английский"], en2ru: ["English speaker learns Russian", "Учим русский"],
+  engHelp: ["Pick a lesson: it becomes slides you can draw on, present and get answers to.", "Выбери урок — он станет слайдами: на них можно рисовать, показывать их и получать ответы."],
+  slidesMade: ["slides", "слайдов"],
   open3d: ["🧊 Turn the 3D model", "🧊 Вращать 3D-модель"],
   // present
   exitPresent: ["Exit (Esc)", "Выход (Esc)"], laser: ["Laser pointer", "Лазерная указка"],

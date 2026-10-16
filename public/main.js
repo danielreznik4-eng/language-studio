@@ -97,7 +97,7 @@ function init() {
     App.lessons = t?.lessons?.length ? t.lessons : [newLesson()]; App.cur = Math.min(t?.cur || 0, App.lessons.length - 1);
     $("h-student").classList.add("hidden");
     $("b-open").onclick = openDialog; $("b-save").onclick = saveLesson;
-    $("b-cad").onclick = () => Cad.open(null); $("b-calc").onclick = () => Calc.open();
+    $("b-cad").onclick = () => Cad.open(null); $("b-eng").onclick = () => EngLessons.open(); $("b-calc").onclick = () => Calc.open();
     $("b-speak").onclick = () => Speak.read(slide(), null, $("b-speak"));
     $("b-share").onclick = () => Live.toggleShare(); $("b-call").onclick = () => Call.toggle(); $("b-present").onclick = () => Present.open();
     slideOps(); bindEditor(); renderToolbar();
@@ -125,7 +125,7 @@ function relabel() {
   $("h-who").textContent = (App.role === "teacher" ? "🎓 " + tr("teacherRole") : "🙋 " + tr("studentRole")) + ": " + App.name;
   setConn(Net.open);
   if (App.role === "teacher") {
-    $("b-open").textContent = tr("open"); $("b-save").textContent = tr("save"); $("b-present").textContent = tr("present");
+    $("b-eng").textContent = "📘 " + tr("engLessons"); $("b-open").textContent = tr("open"); $("b-save").textContent = tr("save"); $("b-present").textContent = tr("present");
     $("b-share").textContent = Live.stream ? tr("stopShare") : tr("share");
     renderToolbar(); renderEditor();
   } else {

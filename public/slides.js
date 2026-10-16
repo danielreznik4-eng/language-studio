@@ -398,6 +398,7 @@ function renderQuestionEditor() {
     <select id="q-type">${[["none", "qNone"], ["choice", "qChoice"], ["text", "qText"], ["number", "qNumber"]].map(([v, k]) => `<option value="${v}" ${q.type === v ? "selected" : ""}>${tr(k)}</option>`).join("")}</select>
     ${q.type !== "none" ? `<input type="text" id="q-prompt" placeholder="${esc(tr("qPrompt"))}" value="${esc(q.prompt)}" style="flex:1;min-width:200px">` : ""}</div>
     ${q.type === "choice" ? `<textarea id="q-opts" rows="3" style="width:100%;margin-top:6px" placeholder="${esc(tr("qOptions"))}">${esc(q.options.map(o => (o.right ? "*" : "") + o.text).join("\n"))}</textarea>` : ""}
+    ${slide().notes ? `<div class="muted" style="margin-top:6px">💡 ${esc(slide().notes)}</div>` : ""}
     ${q.type === "text" || q.type === "number" ? `<input type="text" id="q-ans" style="margin-top:6px;width:100%" placeholder="${esc(tr("qAnswer"))}" value="${esc(q.answer)}">` : ""}`;
   const save = fn => { Ed.commit(); fn(); autosave(); Live.pushLesson(); renderThumbs(); };
   $("q-type").onchange = e => { save(() => q.type = e.target.value); renderQuestionEditor(); };

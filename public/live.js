@@ -219,7 +219,7 @@ function renderStudent() {
   box.innerHTML = slideSVG(s, { texts: Live.texts }); fitBox(box); drawPointer();
   $("b-translate").textContent = Live.texts ? tr("original") : tr("translate");
   const au = $("sv-auto"); if (au) au.onchange = e => { Live.autoTr = e.target.checked; store.set("ls-autotr", Live.autoTr); if (!Live.autoTr) Live.texts = null; renderStudent(); };
-  if (Live.autoTr && !Live.texts && !Live.trOff.has(s.id) && !Live.trBusy) { Live.trBusy = true; Live.translate(true).finally(() => { Live.trBusy = false; }); }
+  if (Live.autoTr && !L.noTranslate && !Live.texts && !Live.trOff.has(s.id) && !Live.trBusy) { Live.trBusy = true; Live.translate(true).finally(() => { Live.trBusy = false; }); }
   // question
   const q = s.question, mine = App.live.answered[s.id];
   if (!q || q.type === "none") { qb.innerHTML = ""; return; }
