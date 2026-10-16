@@ -57,6 +57,12 @@ const server = http.createServer((req, res) => {
     if (req.method === "DELETE") { if (fs.existsSync(file)) fs.unlinkSync(file); return json(200, { ok: true }); }
     return json(405, {});
   }
+  if (url.pathname === "/api/translate") {
+    const q = String(url.searchParams.get("q") || "").slice(0, 1500), to = url.searchParams.get("to") === "en" ? "en" : "ru";
+    if (!q.trim()) return json(200, { text: q });
+    translate(q, to).then(r => json(200, r)).catch(() => json(502, { error: "translation unavailable" }));
+    return;
+  }
   if (url.pathname === "/api/info") return json(200, { addresses: lanAddresses(), port: PORT, hosted: !!process.env.PORT });
   // ---- static files ( /english -> English Coach )
   let p = url.pathname;
@@ -68,6 +74,28 @@ const server = http.createServer((req, res) => {
   res.writeHead(200, { "Content-Type": TYPES[path.extname(file)] || "application/octet-stream", "Cache-Control": "no-cache" });
   fs.createReadStream(file).pipe(res);
 });
+
+// ---------------------------------------------------------------- translation (Google free endpoint, MyMemory as backup), cached
+const trCache = new Map();
+async function translate(q, to) {
+  const key = to + "|" + q;
+  if (trCache.has(key)) return trCache.get(key);
+  let out = null;
+  try {
+    const r = await fetch("https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&dt=t&tl=" + to + "&q=" + encodeURIComponent(q), { signal: AbortSignal.timeout(6000) });
+    const j = await r.json();
+    out = { text: j[0].map(p => p[0]).join(""), from: j[2] };
+  } catch (e) {
+    const from = /[а-яё]/i.test(q) ? "ru" : "en";
+    if (from === to) return { text: q, from };
+    const r = await fetch("https://api.mymemory.translated.net/get?langpair=" + from + "|" + to + "&q=" + encodeURIComponent(q.slice(0, 500)), { signal: AbortSignal.timeout(6000) });
+    const j = await r.json();
+    out = { text: j.responseData?.translatedText || q, from };
+  }
+  if (trCache.size > 5000) trCache.delete(trCache.keys().next().value);
+  trCache.set(key, out);
+  return out;
+}
 
 // ---------------------------------------------------------------- rooms
 // room = { code, clients:Set, state:{lesson, slide, follow, chat}, empty:time }

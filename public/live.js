@@ -1,6 +1,29 @@
 // Live lesson: sync slides to students, answers back to the teacher, chat, screen sharing (WebRTC) and translation.
 "use strict";
+// is this text in the other language? (Russian reader: has English words; English reader: has Russian letters)
+function needsTr(text) {
+  const s = String(text || "");
+  return LANG === "ru" ? /[a-z]{2,}/i.test(s) && !/[а-яё]/i.test(s) : /[а-яё]/i.test(s);
+}
+
 const Live = {
+  trCache: new Map(), trPending: new Set(), trOff: new Set(), trBusy: false,
+  autoTr: store.get("ls-autotr", true), chatTr: store.get("ls-chattr", true),
+  async trText(text) {
+    const key = LANG + "|" + text;
+    if (this.trCache.has(key)) return this.trCache.get(key);
+    const r = await fetch("/api/translate?to=" + LANG + "&q=" + encodeURIComponent(text));
+    if (!r.ok) throw new Error("translate");
+    const out = (await r.json()).text || text;
+    this.trCache.set(key, out); return out;
+  },
+  // cached translation now, or null and fetch it, then call redraw()
+  trLater(text, redraw) {
+    const key = LANG + "|" + text;
+    if (this.trCache.has(key)) return this.trCache.get(key);
+    if (!this.trPending.has(key)) { this.trPending.add(key); this.trText(text).then(redraw, () => {}).finally(() => this.trPending.delete(key)); }
+    return null;
+  },
   chat: [], timer: null, stream: null, peers: new Map(), joinUrls: [], pointer: null, texts: null, translating: false,
 
   pushLesson() {
@@ -81,38 +104,44 @@ const Live = {
 
   // ---------------------------------------------------------------- chat
   chatHTML() {
-    return `<div class="panel"><h3>💬 ${tr("chat")}</h3></div><div class="chat"><div class="chatlog" id="chatlog"></div>
+    return `<div class="panel row" style="justify-content:space-between"><h3>💬 ${tr("chat")}</h3><label class="muted" style="font-size:12px"><input type="checkbox" id="chat-tr" ${this.chatTr ? "checked" : ""}> 🌐 ${tr("autoTranslate")}</label></div><div class="chat"><div class="chatlog" id="chatlog"></div>
       <div class="chatin"><input type="text" id="chatin" placeholder="${esc(tr("typeMsg"))}" maxlength="2000"><button class="btn" id="chatsend">➤</button></div></div>`;
   },
   bindChat() {
     const send = () => { const i = $("chatin"), t = i.value.trim(); if (!t) return; Net.send({ type: "chat", text: t }); i.value = ""; };
     $("chatsend").onclick = send; $("chatin").onkeydown = e => { if (e.key === "Enter") send(); };
+    $("chat-tr").onchange = e => { this.chatTr = e.target.checked; store.set("ls-chattr", this.chatTr); this.drawChat(); };
     this.drawChat();
   },
   drawChat() {
     const log = $("chatlog"); if (!log) return;
     log.innerHTML = this.chat.map(l => `<div class="msg ${l.from === App.myId ? "me" : ""}"><b>${esc(l.name)}${l.role === "teacher" ? " 🎓" : ""}</b>
-      <span class="muted" style="font-size:11px">${new Date(l.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span><div>${esc(l.text)}</div></div>`).join("");
+      <span class="muted" style="font-size:11px">${new Date(l.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span><div>${esc(l.text)}</div>${this.chatLine(l)}</div>`).join("");
     log.scrollTop = log.scrollHeight;
   },
 
-  // ---------------------------------------------------------------- translation (student)
-  async translate() {
+  // translation line under a chat message from someone else
+  chatLine(l) {
+    if (!this.chatTr || l.from === App.myId || !needsTr(l.text)) return "";
+    const t = this.trLater(l.text, () => this.drawChat());
+    return `<div class="muted" style="font-style:italic;font-size:13px;margin-top:2px">🌐 ${t ? esc(t) : "…"}</div>`;
+  },
+
+  // ---------------------------------------------------------------- slide translation (student); auto = runs by itself
+  async translate(auto) {
     const s = studentSlide(); if (!s) return;
-    if (this.texts) { this.texts = null; $("b-translate").textContent = tr("translate"); renderStudent(); return; }
+    if (!auto && this.texts) { this.texts = null; this.trOff.add(s.id); renderStudent(); return; }
+    if (!auto) this.trOff.delete(s.id);
     const items = s.objects.filter(o => o.type === "text").map(o => [o.id, o.text]);
     const q = s.question; if (q && q.type !== "none") { items.push(["q:prompt", q.prompt]); q.options.forEach((o, i) => items.push(["q:" + i, o.text])); }
-    toast(tr("translating"));
+    if (!items.some(([, text]) => needsTr(text))) { if (!auto) toast(tr("alreadyMine")); return; }
+    if (!auto) toast(tr("translating"));
     const out = {};
     try {
-      for (const [id, text] of items) {
-        if (!text.trim()) continue;
-        const from = /[а-яё]/i.test(text) ? "ru" : "en"; if (from === LANG) { out[id] = text; continue; }
-        const r = await fetch("https://api.mymemory.translated.net/get?q=" + encodeURIComponent(text.slice(0, 500)) + "&langpair=" + from + "|" + LANG);
-        const j = await r.json(); out[id] = j.responseData?.translatedText || text;
-      }
-      this.texts = out; $("b-translate").textContent = tr("original"); renderStudent();
-    } catch (e) { toast(tr("translateFail")); }
+      for (const [id, text] of items) out[id] = needsTr(text) ? await this.trText(text) : text;
+      if (studentSlide()?.id !== s.id) return;   // the teacher moved on meanwhile
+      this.texts = out; renderStudent();
+    } catch (e) { if (!auto) toast(tr("translateFail")); }
   },
 };
 
@@ -138,7 +167,8 @@ function renderSide() {
           <div class="muted" style="font-size:12px">${tr("shareLink")}</div>${Live.joinUrls.map(u => `<div class="row"><b style="word-break:break-all;flex:1">${esc(u)}</b><button class="btn small ghost" data-copy="${esc(u)}">${tr("copy")}</button></div>`).join("") || "<span class='muted'>…</span>"}</div>`
       + people
       + `<div class="panel"><h3>✉ ${tr("answers")}</h3><div class="answers">${Object.values(ans).map(a => { const ok = right(a.value);
-          return `<div class="ans ${ok === true ? "ok" : ok === false ? "no" : ""}"><b>${esc(a.name)}:</b> ${esc(a.value)} ${ok === true ? "✔" : ok === false ? "✖" : ""}</div>`; }).join("") || `<span class="muted">${tr("noAnswers")}</span>`}</div></div>`
+          const trd = needsTr(a.value) ? Live.trLater(a.value, renderSide) : null;
+          return `<div class="ans ${ok === true ? "ok" : ok === false ? "no" : ""}"><b>${esc(a.name)}:</b> ${esc(a.value)} ${ok === true ? "✔" : ok === false ? "✖" : ""}${trd ? `<div class="muted" style="font-style:italic">🌐 ${esc(trd)}</div>` : ""}</div>`; }).join("") || `<span class="muted">${tr("noAnswers")}</span>`}</div></div>`
       + Live.chatHTML();
     bindProps();
     const br = $("b-room"); if (br) br.onclick = changeRoom;
@@ -163,12 +193,16 @@ function renderStudent() {
   const s = studentSlide();
   tb.innerHTML = `<button class="tool" id="sv-prev">◀</button><span>${tr("slide")} ${App.live.slide + 1} / ${L.slides.length}</span><button class="tool" id="sv-next">▶</button>
     ${App.live.slide !== App.live.teacherSlide ? `<button class="btn small" id="sv-back">↩ ${tr("follow")}</button>` : ""}
+    <label class="muted" style="font-size:13px"><input type="checkbox" id="sv-auto" ${Live.autoTr ? "checked" : ""}> 🌐 ${tr("autoTranslate")}</label>
     ${s.objects.filter(o => o.type === "model").map((o, i) => `<button class="btn small ghost" data-model="${o.id}">${tr("open3d")} ${i + 1}</button>`).join("")}`;
   $("sv-prev").onclick = () => { App.live.follow = false; App.live.slide = Math.max(0, App.live.slide - 1); Live.texts = null; renderStudent(); };
   $("sv-next").onclick = () => { App.live.follow = false; App.live.slide = Math.min(L.slides.length - 1, App.live.slide + 1); Live.texts = null; renderStudent(); };
   const back = $("sv-back"); if (back) back.onclick = () => { App.live.follow = true; App.live.slide = App.live.teacherSlide; Live.texts = null; renderStudent(); };
   tb.querySelectorAll("[data-model]").forEach(b => b.onclick = () => Cad.open(s.objects.find(o => o.id === b.dataset.model), true));
   box.innerHTML = slideSVG(s, { texts: Live.texts }); fitBox(box); drawPointer();
+  $("b-translate").textContent = Live.texts ? tr("original") : tr("translate");
+  const au = $("sv-auto"); if (au) au.onchange = e => { Live.autoTr = e.target.checked; store.set("ls-autotr", Live.autoTr); if (!Live.autoTr) Live.texts = null; renderStudent(); };
+  if (Live.autoTr && !Live.texts && !Live.trOff.has(s.id) && !Live.trBusy) { Live.trBusy = true; Live.translate(true).finally(() => { Live.trBusy = false; }); }
   // question
   const q = s.question, mine = App.live.answered[s.id];
   if (!q || q.type === "none") { qb.innerHTML = ""; return; }

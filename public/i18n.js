@@ -75,6 +75,7 @@ const STR = {
   // present
   exitPresent: ["Exit (Esc)", "Выход (Esc)"], laser: ["Laser pointer", "Лазерная указка"],
   shareNote: ["Sharing your screen with students in the app. For Discord, use Present and share in Discord.", "Экран показывается ученикам в приложении. Для Discord нажми «Показ» и покажи экран в Discord."],
+  autoTranslate: ["auto-translate", "автоперевод"], alreadyMine: ["This slide is already in your language.", "Этот слайд уже на твоём языке."],
   translating: ["Translating…", "Перевожу…"], translateFail: ["Translation needs the internet.", "Для перевода нужен интернет."],
   confirmDelSlide: ["Delete this slide?", "Удалить этот слайд?"], confirmClose: ["Close this lesson? Unsaved changes will be lost.", "Закрыть урок? Несохранённые изменения пропадут."],
 };
