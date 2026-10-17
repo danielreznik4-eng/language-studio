@@ -99,7 +99,7 @@ function objCore(o, texts) {
 function slideSVG(s, opts = {}) {
   if (!s) return "";
   let body = SVG_DEFS + `<rect x="0" y="0" width="${W}" height="${H}" fill="${s.bg || "#fff"}" data-bg="1"/>`;
-  for (const o of s.objects) body += objSVG(o, opts.texts);
+  for (const o of s.objects) if (o.id !== opts.hide) body += objSVG(o, opts.texts);
   if (opts.selected) {
     const o = s.objects.find(x => x.id === opts.selected);
     if (o) body += selectionSVG(o);
@@ -187,7 +187,8 @@ function renderEditor() {
   const d = Ed.draft;
   if (d && d.type === "poly-draft" && d.points.length) extra = `<polyline points="${pts([...d.points, d.cursor || d.points[d.points.length - 1]])}" fill="none" stroke="#3b6cf0" stroke-width="3" stroke-dasharray="6 4"/>`;
   else if (d && d.obj) extra = objSVG(d.obj);
-  box.innerHTML = slideSVG(slide(), { selected: App.tool === "select" ? App.sel : null, extra });
+  box.innerHTML = slideSVG(slide(), { selected: App.tool === "select" ? App.sel : null, extra, hide: Ed.textEdit?.hide });
+  keepTextEdit(box);
   fitBox(box);
   box.style.cursor = App.tool === "select" ? "default" : App.tool === "erase" ? "not-allowed" : "crosshair";
   renderQuestionEditor(); renderSide();
@@ -222,17 +223,18 @@ function bindEditor() {
   const box = $("slidebox");
   let drag = null;
   box.addEventListener("pointerdown", e => {
-    if (App.role !== "teacher" || e.button !== 0) return;
+    if (App.role !== "teacher" || e.button !== 0 || e.target.closest(".textedit")) return;
     const [x, y] = slidePoint(e), t = e.target, id = t.closest("[data-id]")?.dataset.id, tool = App.tool;
     box.setPointerCapture(e.pointerId);
     if (tool === "select") {
       if (t.dataset.handle && Ed.selObj() && !Ed.selObj().lock) { Ed.commit(); drag = { mode: "handle", h: t.dataset.handle, start: clone(Ed.selObj()) }; return; }
+      const wasSel = id && App.sel === id;
       App.sel = id || null; renderEditor();
-      if (id && !Ed.selObj()?.lock) { Ed.commit(); drag = { mode: "move", last: [x, y], moved: false }; }
+      if (id && !Ed.selObj()?.lock) { Ed.commit(); drag = { mode: "move", last: [x, y], moved: false, wasSel }; }
       return;
     }
     if (tool === "erase") { if (id) { Ed.commit(); slide().objects = slide().objects.filter(o => o.id !== id); Ed.changed(); } drag = { mode: "erase" }; return; }
-    if (tool === "text") { e.preventDefault(); openTextEditor(null, x, y); return; }
+    if (tool === "text") { e.preventDefault(); if (Ed.textEdit) { finishTextEdit(); return; } openTextEditor(null, x, y); return; }
     if (tool === "poly") {
       if (!Ed.draft) Ed.draft = { type: "poly-draft", points: [] };
       Ed.draft.points.push([x, y]); renderEditor(); return;
@@ -269,7 +271,8 @@ function bindEditor() {
   });
   const end = () => {
     if (!drag) return;
-    const mode = drag.mode; drag = null;
+    const mode = drag.mode, clickedSel = mode === "move" && !drag.moved && drag.wasSel; drag = null;
+    if (clickedSel && Ed.selObj()?.type === "text") { Ed.hist.pop(); openTextEditor(Ed.selObj()); return; }
     if (mode === "draw" && Ed.draft?.obj) {
       const o = Ed.draft.obj; Ed.draft = null;
       if (o.type === "path" && o.points.length < 2) o.points.push([o.points[0][0] + 1, o.points[0][1] + 1]);
@@ -293,7 +296,7 @@ function bindEditor() {
     readImage(f, (src, w, h) => target ? fillWithPicture(target, src) : addPicture(src, w, h, x, y));
   });
   box.addEventListener("dblclick", e => {
-    if (App.role !== "teacher") return;
+    if (App.role !== "teacher" || e.target.closest(".textedit") || Ed.textEdit) return;
     if (Ed.draft?.type === "poly-draft") { finishPoly(); return; }
     const id = e.target.closest("[data-id]")?.dataset.id, o = slide().objects.find(x => x.id === id);
     if (o && LABEL_TYPES.includes(o.type) && !o.lock) openLabelEditor(o);
@@ -314,7 +317,8 @@ function renderEditorLight() {
   if (d && d.type === "poly-draft" && d.points.length) extra = `<polyline points="${pts([...d.points, d.cursor || d.points[d.points.length - 1]])}" fill="none" stroke="#3b6cf0" stroke-width="3" stroke-dasharray="6 4"/>` +
     d.points.map(p => `<circle cx="${p[0]}" cy="${p[1]}" r="5" fill="#3b6cf0"/>`).join("");
   else if (d && d.obj) extra = objSVG(d.obj);
-  $("slidebox").innerHTML = slideSVG(slide(), { selected: App.tool === "select" ? App.sel : null, extra });
+  $("slidebox").innerHTML = slideSVG(slide(), { selected: App.tool === "select" ? App.sel : null, extra, hide: Ed.textEdit?.hide });
+  keepTextEdit($("slidebox"));
 }
 
 function finishPoly() {
@@ -327,21 +331,41 @@ function finishPoly() {
 }
 
 function openTextEditor(o, x, y) {
-  const box = $("slidebox"), r = box.getBoundingClientRect(), k = r.width / W;
+  const box = $("slidebox"), k = box.getBoundingClientRect().width / W;
   const isNew = !o;
   if (isNew) o = { id: uid(), type: "text", x, y, w: 600, text: "", size: Ed.style.size, color: Ed.style.color, bold: false };
   const ta = document.createElement("textarea");
   ta.className = "textedit"; ta.value = o.text;
   Object.assign(ta.style, { left: o.x * k + "px", top: o.y * k + "px", width: o.w * k + "px", height: Math.max(o.size * 2.6, 80) * k + "px", fontSize: o.size * k + "px", color: o.color, fontWeight: o.bold ? 700 : 400 });
-  box.appendChild(ta); ta.focus();
-  const done = () => {
-    const text = ta.value.replace(/\s+$/, ""); ta.remove();
+  startTextEdit(ta, isNew ? null : o.id, () => {
+    const text = ta.value.replace(/\s+$/, "");
     if (!text) { if (!isNew) { Ed.commit(); slide().objects = slide().objects.filter(x => x.id !== o.id); Ed.changed(); } else renderEditor(); return; }
+    if (!isNew && text === o.text) { renderEditor(); return; }
     Ed.commit(); o.text = text; if (isNew) slide().objects.push(o);
-    App.sel = o.id; App.tool = "select"; renderToolbar(); Ed.changed();
-  };
-  ta.addEventListener("blur", done, { once: true });
+    if (isNew) App.sel = o.id;
+    App.tool = "select"; renderToolbar(); Ed.changed();
+  });
   ta.addEventListener("keydown", e => { if (e.key === "Escape") ta.blur(); e.stopPropagation(); });
+}
+
+// an on-slide text box that survives slide redraws and only saves when you really click away
+function startTextEdit(ta, hideId, save) {
+  finishTextEdit();
+  const box = $("slidebox");
+  Ed.textEdit = { ta, hide: hideId, save };
+  box.appendChild(ta); if (hideId) renderEditorLight();
+  ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length);
+  ta.addEventListener("pointerdown", e => e.stopPropagation());
+  ta.addEventListener("blur", () => setTimeout(() => { if (Ed.textEdit?.ta === ta && document.activeElement !== ta) finishTextEdit(); }, 0));
+}
+function finishTextEdit() {
+  const t = Ed.textEdit; if (!t) return;
+  Ed.textEdit = null; t.ta.remove(); t.save();
+}
+function keepTextEdit(box) {
+  const t = Ed.textEdit; if (!t) return;
+  const focused = document.activeElement === t.ta || !t.ta.isConnected;
+  box.appendChild(t.ta); if (focused) t.ta.focus();
 }
 
 // pictures: shrink big ones so lessons stay small

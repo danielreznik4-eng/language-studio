@@ -296,8 +296,6 @@ function openLabelEditor(o) {
   const ta = document.createElement("textarea"); ta.className = "textedit"; ta.value = o.label || "";
   const size = o.lsize || 32;
   Object.assign(ta.style, { left: (b.x + b.w * 0.07) * k + "px", top: (b.y + b.h / 2 - size) * k + "px", width: b.w * 0.86 * k + "px", height: Math.max(size * 2.4, 60) * k + "px", fontSize: size * k + "px", textAlign: "center" });
-  box.appendChild(ta); ta.focus();
-  const done = () => { const t = ta.value.trim(); ta.remove(); Ed.commit(); o.label = t; Ed.changed(); };
-  ta.addEventListener("blur", done, { once: true });
+  startTextEdit(ta, null, () => { const t = ta.value.trim(); if (t === (o.label || "")) { renderEditor(); return; } Ed.commit(); o.label = t; Ed.changed(); });
   ta.addEventListener("keydown", ev => { if (ev.key === "Escape" || (ev.key === "Enter" && !ev.shiftKey)) { ev.preventDefault(); ta.blur(); } ev.stopPropagation(); });
 }
