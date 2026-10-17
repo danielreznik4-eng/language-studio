@@ -81,6 +81,12 @@ const STR = {
   engHelp: ["Pick a lesson: it becomes slides you can draw on, present and get answers to.", "Выбери урок — он станет слайдами: на них можно рисовать, показывать их и получать ответы."],
   makeSlides: ["Make slides from a lesson", "Сделать слайды из урока"], sbEnglish: ["English", "Английский"],
   slidesMade: ["slides", "слайдов"],
+  shapes: ["Shapes", "Фигуры"], drawShape: ["Drag on the slide to draw the shape", "Проведи по слайду, чтобы нарисовать фигуру"],
+  paste: ["Paste", "Вставить"], textInShape: ["Text inside the shape", "Текст внутри фигуры"], editText: ["Edit text", "Изменить текст"],
+  changeShape: ["Change shape", "Сменить фигуру"], dashed: ["dashed", "пунктир"], flipH: ["Flip ↔", "Отразить ↔"], flipV: ["Flip ↕", "Отразить ↕"],
+  shadow: ["Shadow", "Тень"], lock: ["Lock", "Закрепить"], insertShape: ["Insert a shape here", "Вставить фигуру сюда"], addTextHere: ["Add text here", "Добавить текст сюда"],
+  pictureInside: ["Picture inside the shape", "Картинка внутри фигуры"], removePicture: ["Remove the picture", "Убрать картинку"],
+  replacePicture: ["Replace picture", "Заменить картинку"], insertPicture: ["Insert a picture here", "Вставить картинку сюда"], rotation: ["Rotation", "Поворот"],
   open3d: ["🧊 Turn the 3D model", "🧊 Вращать 3D-модель"],
   // present
   exitPresent: ["Exit (Esc)", "Выход (Esc)"], laser: ["Laser pointer", "Лазерная указка"],

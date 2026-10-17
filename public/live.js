@@ -150,6 +150,7 @@ const Live = {
     if (!auto && this.texts) { this.texts = null; this.trOff.add(s.id); renderStudent(); return; }
     if (!auto) this.trOff.delete(s.id);
     const items = s.objects.filter(o => o.type === "text").map(o => [o.id, o.text]);
+    s.objects.filter(o => o.label).forEach(o => items.push([o.id + ":label", o.label]));
     const q = s.question; if (q && q.type !== "none") { items.push(["q:prompt", q.prompt]); q.options.forEach((o, i) => items.push(["q:" + i, o.text])); }
     if (!items.some(([, text]) => needsTr(text))) { if (!auto) toast(tr("alreadyMine")); return; }
     if (!auto) toast(tr("translating"));

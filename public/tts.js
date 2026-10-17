@@ -23,11 +23,12 @@ const Speak = {
     if (!s) return [];
     const ru = LANG === "ru", out = [];
     if (s.say) out.push(s.say);   // listening exercises: the word is spoken but not shown
-    const objs = s.objects.filter(o => ["text", "math", "fracpie", "fracbar"].includes(o.type)).slice().sort((a, b) => (a.y - b.y) || (a.x - b.x));
+    const objs = s.objects.filter(o => ["text", "math", "fracpie", "fracbar"].includes(o.type) || o.label).slice().sort((a, b) => (a.y - b.y) || (a.x - b.x));
     for (const o of objs) {
+      if (o.label) out.push(texts?.[o.id + ":label"] ?? o.label);
       if (o.type === "text") out.push(texts?.[o.id] ?? o.text);
       else if (o.type === "math") out.push(this.mathWords(o.src, ru || /[а-яё]/i.test(o.src)));
-      else out.push(ru ? `${o.k} из ${o.n} частей закрашено` : `${o.k} out of ${o.n} parts are shaded`);
+      else if (o.type === "fracpie" || o.type === "fracbar") out.push(ru ? `${o.k} из ${o.n} частей закрашено` : `${o.k} out of ${o.n} parts are shaded`);
     }
     const q = s.question;
     if (q && q.type !== "none") {

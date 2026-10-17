@@ -103,6 +103,22 @@ video#remote{width:100%;border-radius:10px;background:#000}
 #present .pbar:hover{opacity:1}
 .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#222;color:#fff;padding:8px 14px;border-radius:9px;z-index:60}
 .textedit{position:absolute;z-index:5;border:2px dashed var(--acc);background:#fffe;color:#000;resize:both;padding:4px;outline:none;font-family:"Segoe UI",sans-serif}
+/* ---------- right-click menu + shape grid ---------- */
+.ctx{position:fixed;z-index:85;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 34px rgba(0,0,0,.28);padding:6px;width:300px;max-height:86vh;overflow:auto;font-size:14px}
+.ctxh{font-weight:700;padding:6px 8px 8px;border-bottom:1px solid var(--line);margin-bottom:4px}
+.ctxi{display:flex;justify-content:space-between;align-items:center;width:100%;text-align:left;border:0;background:none;padding:7px 8px;border-radius:7px;cursor:pointer;color:var(--ink);font:inherit}
+.ctxi:hover{background:var(--acc2)}
+.ctxi kbd{font:12px Consolas,monospace;color:var(--muted)}
+.ctxrow{display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:4px 8px}
+.ctxrow .ctxi{width:auto;flex:1;justify-content:center;background:var(--chip)}
+.ctxrow>button:not(.ctxi){border:1px solid var(--line);background:var(--chip);border-radius:6px;min-width:30px;padding:3px 8px;cursor:pointer;color:var(--ink)}
+.ctxl{font-size:12px;color:var(--muted);padding:6px 8px 2px;text-transform:uppercase;letter-spacing:.4px}
+.ctxcolors{display:flex;gap:5px;flex-wrap:wrap;padding:4px 8px}
+.ctxcolors button{width:22px;height:22px;border-radius:50%;border:2px solid var(--line);cursor:pointer}
+.ctx hr{border:0;border-top:1px solid var(--line);margin:5px 0}
+.shapegrid{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;padding:6px}
+.shapegrid button{border:1px solid var(--line);background:var(--chip);color:var(--acc);border-radius:8px;padding:3px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.shapegrid button:hover{background:var(--acc2)}
 /* ---------- simple mode: students on phones (big, calm, few buttons) ---------- */
 body.simple{font-size:18px}
 body.simple header{padding:10px 12px;gap:8px}
@@ -231,6 +247,7 @@ body.simple #callwin:not(.full) #cw-tiles>#tile-me{display:none}
 <script src="core.js"></script>
 <script src="slides.js"></script>
 <script src="math.js"></script>
+<script src="shapes.js"></script>
 <script src="tts.js"></script>
 <script src="calc.js"></script>
 <script src="cad.js"></script>

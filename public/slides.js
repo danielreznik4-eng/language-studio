@@ -40,15 +40,40 @@ const pts = list => list.map(p => p[0].toFixed(1) + "," + p[1].toFixed(1)).join(
 
 // ---------------------------------------------------------------- rendering
 // texts: optional map objId -> replacement text (used for the student's translation)
+// outline of any box shape as an SVG path (used for drawing, picture fills and clipping)
+function geomD(o) {
+  switch (o.type) {
+    case "rect": return o.rx ? shapeD("roundrect", o.x, o.y, o.w, o.h, { round: o.rx / Math.max(1, Math.min(o.w, o.h)) }) : `M${o.x} ${o.y} H${o.x + o.w} V${o.y + o.h} H${o.x} Z`;
+    case "ellipse": return `M${o.x} ${o.y + o.h / 2} A${o.w / 2} ${o.h / 2} 0 1 1 ${o.x + o.w} ${o.y + o.h / 2} A${o.w / 2} ${o.h / 2} 0 1 1 ${o.x} ${o.y + o.h / 2} Z`;
+    case "tri": return "M" + pts([[o.x + o.w / 2, o.y], [o.x + o.w, o.y + o.h], [o.x, o.y + o.h]]).replace(/ /g, " L") + " Z";
+    case "star": return "M" + pts(starPoints(o.x, o.y, o.w, o.h)).replace(/ /g, " L") + " Z";
+    case "poly": return "M" + pts(o.points).replace(/ /g, " L") + " Z";
+    case "shape": return shapeD(o.kind, o.x, o.y, o.w, o.h, o);
+  }
+  return "";
+}
+
 function objSVG(o, texts) {
+  const inner = objCore(o, texts);
+  return inner ? decorate(o, inner, texts) : "";
+}
+
+function objCore(o, texts) {
   const style = `fill="${o.fill || "none"}" stroke="${o.stroke || "none"}" stroke-width="${o.sw ?? 0}" opacity="${o.op ?? 1}"`;
   const id = `data-id="${o.id}"`;
+  // shapes (also rect/ellipse/triangle/star/custom shape): optional picture inside, clipped to the outline
+  if (["rect", "ellipse", "tri", "star", "shape", "poly"].includes(o.type)) {
+    const d = geomD(o);
+    if (o.img) {
+      const b = bbox(o), cid = "clip-" + o.id;
+      return `<g ${id} opacity="${o.op ?? 1}"><clipPath id="${cid}"><path d="${d}" fill-rule="evenodd"/></clipPath>` +
+        `<path d="${d}" fill="${o.fill && o.fill !== "none" ? o.fill : "#fff"}" fill-rule="evenodd"/>` +
+        `<image href="${o.img}" x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" preserveAspectRatio="xMidYMid slice" clip-path="url(#${cid})"/>` +
+        `<path d="${d}" fill="none" stroke="${o.stroke || "none"}" stroke-width="${o.sw ?? 0}" fill-rule="evenodd" stroke-linejoin="round"/></g>`;
+    }
+    return `<path ${id} d="${d}" ${style} fill-rule="evenodd" stroke-linejoin="round"/>`;
+  }
   switch (o.type) {
-    case "rect": return `<rect ${id} x="${o.x}" y="${o.y}" width="${o.w}" height="${o.h}" rx="${o.rx || 0}" ${style}/>`;
-    case "ellipse": return `<ellipse ${id} cx="${o.x + o.w / 2}" cy="${o.y + o.h / 2}" rx="${o.w / 2}" ry="${o.h / 2}" ${style}/>`;
-    case "tri": return `<polygon ${id} points="${pts([[o.x + o.w / 2, o.y], [o.x + o.w, o.y + o.h], [o.x, o.y + o.h]])}" ${style} stroke-linejoin="round"/>`;
-    case "star": return `<polygon ${id} points="${pts(starPoints(o.x, o.y, o.w, o.h))}" ${style} stroke-linejoin="round"/>`;
-    case "poly": return `<polygon ${id} points="${pts(o.points)}" ${style} stroke-linejoin="round"/>`;
     case "path": return `<polyline ${id} points="${pts(o.points)}" fill="none" stroke="${o.stroke}" stroke-width="${o.sw}" opacity="${o.op ?? 1}" stroke-linecap="round" stroke-linejoin="round"/>`;
     case "line": return `<line ${id} x1="${o.x1}" y1="${o.y1}" x2="${o.x2}" y2="${o.y2}" stroke="${o.stroke}" stroke-width="${o.sw}" opacity="${o.op ?? 1}" stroke-linecap="round"/>`;
     case "arrow": {
@@ -73,15 +98,11 @@ function objSVG(o, texts) {
 
 function slideSVG(s, opts = {}) {
   if (!s) return "";
-  let body = `<rect x="0" y="0" width="${W}" height="${H}" fill="${s.bg || "#fff"}" data-bg="1"/>`;
+  let body = SVG_DEFS + `<rect x="0" y="0" width="${W}" height="${H}" fill="${s.bg || "#fff"}" data-bg="1"/>`;
   for (const o of s.objects) body += objSVG(o, opts.texts);
   if (opts.selected) {
     const o = s.objects.find(x => x.id === opts.selected);
-    if (o) {
-      const b = bbox(o);
-      body += `<rect x="${b.x - 6}" y="${b.y - 6}" width="${b.w + 12}" height="${b.h + 12}" fill="none" stroke="#3b6cf0" stroke-width="2" stroke-dasharray="8 5" pointer-events="none"/>`;
-      body += `<rect data-handle="1" x="${b.x + b.w}" y="${b.y + b.h}" width="16" height="16" fill="#3b6cf0" stroke="#fff" stroke-width="2" style="cursor:nwse-resize"/>`;
-    }
+    if (o) body += selectionSVG(o);
   }
   if (opts.extra) body += opts.extra;
   return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">${body}</svg>`;
@@ -113,7 +134,7 @@ const Ed = {
 
 const TOOLS = [
   ["select", "🖱", "tSelect", "v"], ["text", "T", "tText", "t"], ["rect", "▭", "tRect", "r"], ["ellipse", "◯", "tEllipse", "o"],
-  ["tri", "△", "tTri", ""], ["star", "☆", "tStar", ""], ["line", "╱", "tLine", "l"], ["arrow", "➜", "tArrow", "a"],
+  ["line", "╱", "tLine", "l"], ["arrow", "➜", "tArrow", "a"],
   ["poly", "✎◇", "tPoly", "p"], ["pen", "🖌", "tPen", "b"], ["erase", "🧽", "tErase", "e"],
 ];
 const SWATCH = ["#1c2230", "#ffffff", "#e53935", "#fb8c00", "#ffd84d", "#43a047", "#1e88e5", "#8e24aa", "#6d4c41", "#9e9e9e"];
@@ -121,6 +142,7 @@ const SWATCH = ["#1c2230", "#ffffff", "#e53935", "#fb8c00", "#ffd84d", "#43a047"
 function renderToolbar() {
   const tb = $("toolbar");
   tb.innerHTML = TOOLS.map(([k, ic, tip]) => `<button class="tool ${App.tool === k ? "on" : ""}" data-tool="${k}" title="${esc(tr(tip))}">${ic}</button>`).join("")
+    + `<button class="tool ${App.tool === "shape" ? "on" : ""}" id="t-shapes" title="${esc(tr("shapes"))}">⬠ ${esc(tr("shapes"))} ▾</button>`
     + `<button class="tool" id="t-img" title="${esc(tr("tImage"))}">🖼</button><span class="sep"></span>`
     + [["math", "∑", "tMath"], ["fracpie", "◔", "tPie"], ["fracbar", "▤", "tBar"], ["numline", "↔", "tNumline"], ["graph", "📈", "tGraph"]]
       .map(([k, ic, tip]) => `<button class="tool" data-math="${k}" title="${esc(tr(tip))}">${ic}</button>`).join("") + `<span class="sep"></span>`
@@ -128,7 +150,8 @@ function renderToolbar() {
     + `<span class="sep"></span><button class="tool" id="t-undo" title="${esc(tr("undo"))}">↶</button><button class="tool" id="t-redo" title="${esc(tr("redo"))}">↷</button>`;
   tb.querySelectorAll("[data-tool]").forEach(b => b.onclick = () => setTool(b.dataset.tool));
   tb.querySelectorAll("[data-color]").forEach(b => b.onclick = () => applyColor(b.dataset.color));
-  $("t-img").onclick = () => $("imgfile").click();
+  $("t-img").onclick = () => { Ed.picTarget = null; Ed.picAt = null; $("imgfile").click(); };
+  $("t-shapes").onclick = e => openShapePicker(e.currentTarget);
   tb.querySelectorAll("[data-math]").forEach(b => b.onclick = () => {
     if (b.dataset.math === "math") return MathPanel.open(null);
     Ed.commit(); const o = newMathObj(b.dataset.math, 200, 160); slide().objects.push(o); App.sel = o.id; setTool("select"); Ed.changed();
@@ -203,9 +226,9 @@ function bindEditor() {
     const [x, y] = slidePoint(e), t = e.target, id = t.closest("[data-id]")?.dataset.id, tool = App.tool;
     box.setPointerCapture(e.pointerId);
     if (tool === "select") {
-      if (t.dataset.handle && Ed.selObj()) { Ed.commit(); drag = { mode: "resize", start: clone(Ed.selObj()) }; return; }
+      if (t.dataset.handle && Ed.selObj() && !Ed.selObj().lock) { Ed.commit(); drag = { mode: "handle", h: t.dataset.handle, start: clone(Ed.selObj()) }; return; }
       App.sel = id || null; renderEditor();
-      if (id) { Ed.commit(); drag = { mode: "move", last: [x, y], moved: false }; }
+      if (id && !Ed.selObj()?.lock) { Ed.commit(); drag = { mode: "move", last: [x, y], moved: false }; }
       return;
     }
     if (tool === "erase") { if (id) { Ed.commit(); slide().objects = slide().objects.filter(o => o.id !== id); Ed.changed(); } drag = { mode: "erase" }; return; }
@@ -218,6 +241,7 @@ function bindEditor() {
     let obj;
     if (tool === "pen") obj = { id: uid(), type: "path", points: [[x, y]], stroke: st.stroke, sw: Math.max(2, st.sw), op: 1 };
     else if (tool === "line" || tool === "arrow") obj = { id: uid(), type: tool, x1: x, y1: y, x2: x, y2: y, stroke: st.stroke, sw: st.sw };
+    else if (tool === "shape") obj = newShape(Ed.shapeKind || "roundrect", x, y, 0, 0);
     else obj = { id: uid(), type: tool, x, y, w: 0, h: 0, fill: st.fill, stroke: st.stroke, sw: st.sw };
     Ed.draft = { obj, start: [x, y] };
     drag = { mode: "draw" };
@@ -230,8 +254,8 @@ function bindEditor() {
     if (drag.mode === "move") {
       const o = Ed.selObj(); if (!o) return;
       moveObj(o, x - drag.last[0], y - drag.last[1]); drag.last = [x, y]; drag.moved = true; renderEditorLight();
-    } else if (drag.mode === "resize") {
-      resizeObj(Ed.selObj(), drag.start, x, y); renderEditorLight();
+    } else if (drag.mode === "handle") {
+      dragHandle(Ed.selObj(), drag.start, drag.h, x, y, e.shiftKey); renderEditorLight();
     } else if (drag.mode === "erase") {
       const id = document.elementFromPoint(e.clientX, e.clientY)?.closest("[data-id]")?.dataset.id;
       if (id) { Ed.commit(); slide().objects = slide().objects.filter(o => o.id !== id); renderEditorLight(); }
@@ -254,13 +278,25 @@ function bindEditor() {
       Ed.commit(); slide().objects.push(o); if (o.type !== "path") { App.sel = o.id; }
       Ed.changed(); return;
     }
-    if (mode === "move" || mode === "resize" || mode === "erase") Ed.changed();
+    if (mode === "move" || mode === "handle" || mode === "erase") Ed.changed();
   };
   box.addEventListener("pointerup", end); box.addEventListener("pointercancel", end);
+  box.addEventListener("contextmenu", openCtxMenu);
+  // pictures: drop a file on the slide (on a shape = picture inside the shape)
+  box.addEventListener("dragover", e => { if (App.role === "teacher") e.preventDefault(); });
+  box.addEventListener("drop", e => {
+    if (App.role !== "teacher") return;
+    const f = [...(e.dataTransfer?.files || [])].find(x => x.type.startsWith("image/")); if (!f) return;
+    e.preventDefault();
+    const [x, y] = slidePoint(e), id = document.elementFromPoint(e.clientX, e.clientY)?.closest("[data-id]")?.dataset.id;
+    const target = slide().objects.find(o => o.id === id && LABEL_TYPES.includes(o.type));
+    readImage(f, (src, w, h) => target ? fillWithPicture(target, src) : addPicture(src, w, h, x, y));
+  });
   box.addEventListener("dblclick", e => {
     if (App.role !== "teacher") return;
     if (Ed.draft?.type === "poly-draft") { finishPoly(); return; }
     const id = e.target.closest("[data-id]")?.dataset.id, o = slide().objects.find(x => x.id === id);
+    if (o && LABEL_TYPES.includes(o.type) && !o.lock) openLabelEditor(o);
     if (o?.type === "text") openTextEditor(o);
     if (o?.type === "model") Cad.open(o);
     if (o?.type === "math") MathPanel.open(o);
@@ -309,8 +345,8 @@ function openTextEditor(o, x, y) {
 }
 
 // pictures: shrink big ones so lessons stay small
-$("imgfile").addEventListener("change", e => {
-  const f = e.target.files[0]; e.target.value = ""; if (!f) return;
+// read a picture file (shrunk to max 1400 px so lessons stay small): cb(src, width, height)
+function readImage(f, cb) {
   const rd = new FileReader();
   rd.onload = () => {
     const img = new Image();
@@ -318,15 +354,37 @@ $("imgfile").addEventListener("change", e => {
       const max = 1400, k = Math.min(1, max / Math.max(img.width, img.height));
       const c = document.createElement("canvas"); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
       c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
-      const src = c.toDataURL(f.type === "image/png" ? "image/png" : "image/jpeg", 0.85);
-      const fit = Math.min(640 / c.width, 400 / c.height, 1);
-      Ed.commit();
-      const o = { id: uid(), type: "image", src, x: 320, y: 160, w: Math.round(c.width * fit), h: Math.round(c.height * fit) };
-      slide().objects.push(o); App.sel = o.id; setTool("select"); Ed.changed();
+      cb(c.toDataURL(f.type === "image/png" || f.type === "image/gif" ? "image/png" : "image/jpeg", 0.85), c.width, c.height);
     };
     img.src = rd.result;
   };
   rd.readAsDataURL(f);
+}
+// put a picture on the slide, centered on (cx, cy)
+function addPicture(src, w, h, cx = 640, cy = 360) {
+  const fit = Math.min(640 / w, 400 / h, 1), pw = Math.round(w * fit), ph = Math.round(h * fit);
+  Ed.commit();
+  const o = { id: uid(), type: "image", src, x: Math.round(cx - pw / 2), y: Math.round(cy - ph / 2), w: pw, h: ph };
+  slide().objects.push(o); App.sel = o.id; setTool("select"); Ed.changed();
+}
+function fillWithPicture(o, src) { Ed.commit(); o.img = src; App.sel = o.id; Ed.changed(); }
+
+// the picture button / menu: Ed.picTarget set = fill that shape, else add a new picture
+$("imgfile").addEventListener("change", e => {
+  const f = e.target.files[0]; e.target.value = ""; if (!f) return;
+  const target = Ed.picTarget && slide().objects.includes(Ed.picTarget) ? Ed.picTarget : null, at = Ed.picAt;
+  Ed.picTarget = null; Ed.picAt = null;
+  const rep = Ed.replaceImg && slide().objects.includes(Ed.replaceImg) ? Ed.replaceImg : null; Ed.replaceImg = null;
+  readImage(f, (src, w, h) => rep ? (Ed.commit(), rep.src = src, Ed.changed()) : target ? fillWithPicture(target, src) : addPicture(src, w, h, ...(at || [640, 360])));
+});
+// paste a picture from the clipboard (screenshot, copied image)
+addEventListener("paste", e => {
+  if (App.role !== "teacher" || e.target.closest?.("input, textarea") || !$("cad").classList.contains("hidden")) return;
+  const item = [...(e.clipboardData?.items || [])].find(i => i.type.startsWith("image/"));
+  if (!item) { if (Ed.clip) { e.preventDefault(); pasteObj(null); } return; }
+  e.preventDefault();
+  const sel = Ed.selObj();
+  readImage(item.getAsFile(), (src, w, h) => sel && LABEL_TYPES.includes(sel.type) && !sel.lock ? fillWithPicture(sel, src) : addPicture(src, w, h));
 });
 
 // ---------------------------------------------------------------- properties + question editor
@@ -352,6 +410,15 @@ function propsHTML() {
       <label>${tr("bold")} <input type="checkbox" id="p-bold" ${o.bold ? "checked" : ""}></label>` : ""}
     ${isMath ? mathPropsHTML(o) : ""}
     <label>${tr("opacity")} <input type="range" id="p-op" min="10" max="100" value="${Math.round((o.op ?? 1) * 100)}"></label>
+    ${canRotate(o) ? `<label>${tr("rotation")} <span class="row"><input type="number" id="p-rot" min="0" max="359" value="${o.rot || 0}" style="width:64px">°
+      <button class="btn small ghost" id="p-fx" title="${esc(tr("flipH"))}">⇋</button><button class="btn small ghost" id="p-fy" title="${esc(tr("flipV"))}">⇵</button></span></label>` : ""}
+    <label>${tr("shadow")} <input type="checkbox" id="p-shadow" ${o.shadow ? "checked" : ""}></label>
+    ${hasStroke ? `<label>${tr("dashed")} <input type="checkbox" id="p-dash" ${o.dash ? "checked" : ""}></label>` : ""}
+    <label>🔒 ${tr("lock")} <input type="checkbox" id="p-lock" ${o.lock ? "checked" : ""}></label>
+    ${LABEL_TYPES.includes(o.type) ? `<label style="display:block">${tr("textInShape")}<input type="text" id="p-label" value="${esc(o.label || "")}" style="width:100%"></label>
+      <label>${tr("fontSize")} <span class="row"><input type="number" id="p-lsize" min="8" max="200" value="${o.lsize || 32}" style="width:64px"><input type="color" id="p-lcolor" value="${o.lcolor || "#1c2230"}"></span></label>
+      <div class="row"><button class="btn small ghost" id="p-pic">🖼 ${tr("pictureInside")}</button>${o.img ? `<button class="btn small ghost" id="p-nopic">✖</button>` : ""}</div>` : ""}
+    ${o.type === "shape" || ["rect", "ellipse", "tri", "star"].includes(o.type) ? `<div class="row"><button class="btn small ghost" id="p-kind">🔁 ${tr("changeShape")}</button></div>` : ""}
     <div class="row"><button class="btn small ghost" id="p-front">${tr("front")}</button><button class="btn small ghost" id="p-back">${tr("back")}</button>
     <button class="btn small ghost" id="p-dup">${tr("dup")}</button><button class="btn small danger" id="p-del">${tr("del")}</button></div></div>`;
 }
@@ -376,6 +443,17 @@ function bindProps() {
   on("p-size", "change", e => set(() => o.size = Math.max(8, +e.target.value)));
   on("p-bold", "change", e => set(() => o.bold = e.target.checked));
   on("p-op", "change", e => set(() => o.op = +e.target.value / 100));
+  on("p-rot", "change", e => set(() => o.rot = ((+e.target.value % 360) + 360) % 360));
+  on("p-fx", "click", () => set(() => o.fx = !o.fx)); on("p-fy", "click", () => set(() => o.fy = !o.fy));
+  on("p-shadow", "change", e => set(() => o.shadow = e.target.checked)); on("p-dash", "change", e => set(() => o.dash = e.target.checked));
+  on("p-lock", "change", e => set(() => o.lock = e.target.checked));
+  on("p-label", "change", e => set(() => o.label = e.target.value)); on("p-lsize", "change", e => set(() => o.lsize = Math.max(8, +e.target.value)));
+  on("p-lcolor", "change", e => set(() => o.lcolor = e.target.value));
+  on("p-pic", "click", () => { Ed.picTarget = o; $("imgfile").click(); }); on("p-nopic", "click", () => set(() => delete o.img));
+  on("p-kind", "click", e => {   // same shape grid as the right-click menu; picking one changes this shape
+    openShapePicker(e.currentTarget);
+    document.querySelectorAll("#ctxmenu [data-shape]").forEach(b => b.onclick = () => { closeCtx(); set(() => { const k = b.dataset.shape; if (["rect", "ellipse", "tri", "star"].includes(k)) { o.type = k; delete o.kind; } else { o.type = "shape"; o.kind = k; } }); });
+  });
   on("p-front", "click", () => set(() => { const a = slide().objects; a.push(a.splice(a.indexOf(o), 1)[0]); }));
   on("p-back", "click", () => set(() => { const a = slide().objects; a.unshift(a.splice(a.indexOf(o), 1)[0]); }));
   on("p-dup", "click", () => duplicateSelected());
@@ -440,7 +518,8 @@ addEventListener("keydown", e => {
   if ((e.ctrlKey || e.metaKey) && k === "z") { e.preventDefault(); Ed.undo(); return; }
   if ((e.ctrlKey || e.metaKey) && k === "y") { e.preventDefault(); Ed.redo(); return; }
   if ((e.ctrlKey || e.metaKey) && k === "d") { e.preventDefault(); duplicateSelected(); return; }
-  if (k === "delete" || k === "backspace") { deleteSelected(); return; }
+  if ((e.ctrlKey || e.metaKey) && k === "c" && Ed.selObj()) { Ed.clip = clone(Ed.selObj()); toast(tr("copied")); return; }
+  if ((k === "delete" || k === "backspace") && !Ed.selObj()?.lock) { deleteSelected(); return; }
   if (k === "escape") { Ed.draft = null; App.sel = null; renderEditor(); return; }
   if (k === "enter" && Ed.draft?.type === "poly-draft") { finishPoly(); return; }
   const o = Ed.selObj();
