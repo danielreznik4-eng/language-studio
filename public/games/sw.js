@@ -1,6 +1,6 @@
 // Games app service worker - keeps every game on the device (so they work offline) and holds back a new
 // version until the player taps "Update now" in the app.
-const VERSION = "2026.10.21.2253";
+const VERSION = "2026.10.22.0605";
 const CACHE = "games-" + VERSION;
 const FILES = [
   "/games/",
