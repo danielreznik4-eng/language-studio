@@ -150,6 +150,18 @@
   .zbar .bar { height: 14px; background: rgba(0, 0, 0, .45); } .zbar .bar i { background: var(--good); }
   .zbar p { margin: 4px 0 0; text-align: center; font-size: 13px; font-weight: 600; }
   .ups { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+  .up.picked { border-color: var(--good); background: rgba(105, 219, 124, .15); }
+  .up:disabled { opacity: .45; cursor: default; }
+  #zCard { overflow-y: auto; justify-content: safe center; }
+  .zshop { width: min(620px, 100%); display: grid; gap: 8px; }
+  .zshop h3 { margin: 6px 0 0; font-family: var(--font-display); font-weight: 400; font-size: 18px; display: flex; justify-content: space-between; gap: 8px; }
+  .zshop h3 span { color: var(--gold); }
+  .wrow { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 10px; align-items: center; background: var(--panel); border: 1px solid var(--panel-line);
+          border-radius: 12px; padding: 8px 10px; text-align: left; }
+  .wrow canvas { width: 40px; height: 40px; border-radius: 8px; background: #22381f; }
+  .wrow b { font-size: 15px; } .wrow small { display: block; color: var(--muted); font-size: 12px; }
+  .wrow button { font: 700 13px var(--font-body); border: 0; border-radius: 8px; padding: 8px 12px; cursor: pointer; background: var(--gold); color: #3a2c00; min-width: 120px; }
+  .wrow button:disabled { background: rgba(255, 255, 255, .15); color: var(--muted); cursor: not-allowed; }
   .up { width: 170px; background: var(--panel); border: 2px solid var(--panel-line); border-radius: 14px; padding: 14px; color: var(--text); font: inherit; cursor: pointer; display: grid; gap: 4px; }
   .up:hover, .up:focus-visible { border-color: var(--gold); outline: none; }
   .up b { font-size: 16px; } .up span { color: var(--muted); font-size: 13px; } .up kbd { font: 700 12px var(--font-body); color: var(--gold); }
@@ -243,8 +255,9 @@
     <div class="zbar"><div class="bar"><i id="zHp"></i></div><p id="zHpText">100 / 100</p></div>
     <div class="card" id="zCard">
       <h2 id="zTitle">ZOMBIE WAVES</h2>
-      <p id="zText">Move with <b>WASD</b> or the <b>arrow keys</b> (or hold your finger on the screen). You shoot the nearest zombie by yourself. Survive each wave until the timer runs out, then pick an upgrade. A <b>Boss Zombie</b> comes every 5th wave!</p>
+      <p id="zText">Move with <b>WASD</b> or the <b>arrow keys</b> (or hold your finger on the screen). Your weapons float around you and shoot the nearest zombies by themselves. Survive each wave, then spend the cash zombies drop on new weapons and upgrades. A <b>Boss Zombie</b> comes every 5th wave!</p>
       <div class="ups" id="zUps"></div>
+      <div class="zshop" id="zShop"></div>
       <button class="go" id="zGo" type="button">START</button>
     </div>
   </section>
@@ -373,13 +386,34 @@ const SFX = {   // [wave, start Hz, end Hz, seconds, volume]
   ach: [["triangle", 523, 523, .12, .08], ["triangle", 659, 659, .12, .08, .1], ["triangle", 784, 784, .22, .08, .2]],
   kill: [["square", 300, 90, .07, .025]],
   hurt: [["sawtooth", 140, 90, .15, .05]],
+  pistol: [["square", 900, 220, .07, .035]],
+  smg: [["square", 1300, 500, .035, .022]],
+  shotgun: [["noise", 900, 0, .16, .12], ["square", 160, 60, .12, .05]],
+  sniper: [["sawtooth", 2400, 300, .12, .045], ["noise", 3000, 0, .06, .05]],
+  rocket: [["sawtooth", 200, 600, .25, .04]],
+  boom: [["noise", 300, 0, .35, .16], ["sine", 120, 40, .3, .1]],
+  sword: [["noise", 4000, 0, .1, .06], ["triangle", 700, 300, .08, .03]],
+  cash: [["triangle", 1400, 1900, .05, .03]],
 };
+const SFX_LIMIT = { pistol: 60, smg: 55, shotgun: 90, sniper: 90, rocket: 90, boom: 80, sword: 70, kill: 50, cash: 45 };
+const sfxLast = {};
 function sfx(name) {
   if (!sfxOn) return;
+  const now = performance.now();
+  if (SFX_LIMIT[name] && now - (sfxLast[name] || 0) < SFX_LIMIT[name]) return;
+  sfxLast[name] = now;
   try {
     actx = actx || new (window.AudioContext || window.webkitAudioContext)();
     if (actx.state === "suspended") actx.resume();
     for (const [type, f1, f2, dur, vol, delay = 0] of SFX[name]) {
+      if (type === "noise") {   // a burst of static through a filter: bangs, booms, swishes
+        const t = actx.currentTime + delay, len = Math.ceil(actx.sampleRate * dur), buf = actx.createBuffer(1, len, actx.sampleRate), d = buf.getChannelData(0);
+        for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+        const src = actx.createBufferSource(), f = actx.createBiquadFilter(), g = actx.createGain();
+        src.buffer = buf; f.type = "bandpass"; f.frequency.value = f1; f.Q.value = .8; g.gain.setValueAtTime(vol, t);
+        src.connect(f).connect(g).connect(actx.destination); src.start(t);
+        continue;
+      }
       const t = actx.currentTime + delay, o = actx.createOscillator(), g = actx.createGain();
       o.type = type; o.frequency.setValueAtTime(f1, t); o.frequency.exponentialRampToValueAtTime(f2, t + dur);
       g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
@@ -733,20 +767,43 @@ addEventListener("resize", () => { if (screen === "zombie") { zResize(); zDraw()
 
 function renderZMine() { $("zMine").textContent = `Your kills ever: ${fmt(me.zKills || 0)} · Best wave: ${me.zBestWave || 0}`; }
 
+// free stat upgrades (pick 1 of 3 after each wave) - they boost every weapon
 const UPGRADES = [
-  { n: "Sharper bullets", d: "+25% damage", f: () => { Z.dmg *= 1.25; } },
-  { n: "Faster trigger", d: "+20% fire rate", f: () => { Z.fireDelay = Math.max(5, Z.fireDelay / 1.2); } },
+  { n: "Sharper bullets", d: "+25% damage for all weapons", f: () => { Z.dmgMul *= 1.25; } },
+  { n: "Faster trigger", d: "+20% fire rate for all weapons", f: () => { Z.rateMul *= 1.2; } },
   { n: "Running shoes", d: "+12% move speed", f: () => { Z.speed *= 1.12; } },
   { n: "Thick skin", d: "+25 max health", f: () => { Z.maxHp += 25; Z.hp += 25; } },
-  { n: "Double shot", d: "+1 bullet each shot", f: () => { Z.bullets = Math.min(7, Z.bullets + 1); } },
-  { n: "Long gun", d: "+20% range", f: () => { Z.range *= 1.2; } },
+  { n: "Extra barrel", d: "+1 bullet for every gun", f: () => { Z.extra = Math.min(4, Z.extra + 1); } },
+  { n: "Long arms", d: "+20% range for all weapons", f: () => { Z.rangeMul *= 1.2; } },
   { n: "First aid", d: "Heal to full health", f: () => { Z.hp = Z.maxHp; } },
 ];
+// weapons float around you and fire on their own (buy and upgrade them in the shop between waves)
+const WEAPONS = {
+  pistol:  { name: "Pistol",  desc: "Steady single shots",            price: 15, dmg: 10, cd: 30, range: 420, speed: 11, shots: 1, spread: 0,   color: "#dee2e6" },
+  smg:     { name: "SMG",     desc: "Very fast, weaker bullets",      price: 25, dmg: 4.5, cd: 8, range: 360, speed: 12, shots: 1, spread: .12, color: "#74c0fc" },
+  shotgun: { name: "Shotgun", desc: "5 pellets at once, short range", price: 35, dmg: 7,  cd: 55, range: 300, speed: 10, shots: 5, spread: .5,  color: "#ffa94d" },
+  sniper:  { name: "Sniper",  desc: "Huge damage, goes through 3",    price: 45, dmg: 45, cd: 85, range: 720, speed: 20, shots: 1, spread: 0, pierce: 3, color: "#b197fc" },
+  rocket:  { name: "Rocket",  desc: "Explodes and hits a whole group", price: 60, dmg: 28, cd: 95, range: 540, speed: 7, shots: 1, spread: 0, splash: 85, color: "#ff6b6b" },
+  sword:   { name: "Sword",   desc: "Slashes every zombie close by",  price: 20, dmg: 24, cd: 34, range: 85, melee: true, color: "#f8f9fa" },
+};
+const MAX_WEAPONS = 6, MAX_TIER = 4, ROMAN = ["", "I", "II", "III", "IV"];
+const wStat = (w, k) => {   // a weapon's numbers with its tier and your upgrades
+  const b = WEAPONS[w.type];
+  if (k === "dmg") return b.dmg * (1 + .5 * (w.tier - 1)) * Z.dmgMul;
+  if (k === "cd") return Math.max(4, b.cd * Math.pow(.85, w.tier - 1) / Z.rateMul);
+  if (k === "range") return b.range * Z.rangeMul;
+};
+const upgradeCost = w => WEAPONS[w.type].price * w.tier;
 
 function zNewRun() {
-  Z = { px: WORLD / 2, py: WORLD / 2, hp: 100, maxHp: 100, speed: 3.2, dmg: 10, fireDelay: 24, range: 430, bullets: 1,
-        fireCd: 0, inv: 0, wave: 0, kills: 0, zombies: [], shots: [], warns: [], splats: [], running: false, waveFrames: 0,
+  Z = { px: WORLD / 2, py: WORLD / 2, hp: 100, maxHp: 100, speed: 3.2, dmgMul: 1, rateMul: 1, rangeMul: 1, extra: 0, cash: 0,
+        weapons: [{ type: "pistol", tier: 1, cd: 10, aim: 0 }], picked: false,
+        inv: 0, wave: 0, kills: 0, zombies: [], shots: [], warns: [], splats: [], booms: [], slashes: [], running: false, waveFrames: 0,
         spawnCd: 0, phase: "ready", t: 0 };
+}
+function weaponPos(i) {   // where weapon i floats around you
+  const n = Z.weapons.length, a = -Math.PI / 2 + i / n * Math.PI * 2 + Z.t * .012;
+  return { x: Z.px + Math.cos(a) * 40, y: Z.py + Math.sin(a) * 40 };
 }
 function zStartWave() {
   Z.wave++; Z.waveFrames = Math.min(60, 22 + Z.wave * 3) * 60; Z.spawnCd = 40;
@@ -781,31 +838,46 @@ function zStep() {
   Z.px = Math.max(20, Math.min(WORLD - 20, Z.px)); Z.py = Math.max(20, Math.min(WORLD - 20, Z.py));
   if (Z.inv > 0) Z.inv--;
 
-  // shoot the nearest zombie in range (auto-aim)
-  if (--Z.fireCd <= 0) {
-    let best = null, bd = Z.range;
-    for (const z of Z.zombies) { const d = Math.hypot(z.x - Z.px, z.y - Z.py) - z.r; if (d < bd) { bd = d; best = z; } }
-    if (best) {
-      const base = Math.atan2(best.y - Z.py, best.x - Z.px);
-      for (let i = 0; i < Z.bullets; i++) {
-        const a = base + (i - (Z.bullets - 1) / 2) * 0.12;
-        Z.shots.push({ x: Z.px, y: Z.py, vx: Math.cos(a) * 11, vy: Math.sin(a) * 11, life: Z.range / 11 + 4 });
-      }
-      Z.fireCd = Z.fireDelay;
+  // every weapon aims at the nearest zombie in its range and fires on its own
+  Z.weapons.forEach((w, i) => {
+    const b = WEAPONS[w.type], pos = weaponPos(i), range = wStat(w, "range");
+    let best = null, bd = range;
+    for (const z of Z.zombies) { const d = Math.hypot(z.x - pos.x, z.y - pos.y) - z.r; if (d < bd) { bd = d; best = z; } }
+    if (best) w.aim = Math.atan2(best.y - pos.y, best.x - pos.x);
+    if (--w.cd > 0 || !best) return;
+    w.cd = wStat(w, "cd");
+    const dmg = wStat(w, "dmg");
+    if (b.melee) {   // sword: slash everything close by
+      for (const z of Z.zombies) if (z.hp > 0 && Math.hypot(z.x - pos.x, z.y - pos.y) - z.r < range) { zHit(z, dmg, Math.cos(w.aim) * 4, Math.sin(w.aim) * 4); }
+      Z.slashes.push({ x: pos.x, y: pos.y, a: w.aim, r: range, t: 10 }); sfx("sword"); return;
     }
-  }
+    const shots = b.shots + Z.extra;
+    for (let k = 0; k < shots; k++) {
+      const a = w.aim + (shots > 1 ? (k - (shots - 1) / 2) * Math.max(.1, b.spread / Math.max(1, shots - 1) * 1.6) : 0) + (Math.random() - .5) * b.spread * .3;
+      Z.shots.push({ x: pos.x, y: pos.y, vx: Math.cos(a) * b.speed, vy: Math.sin(a) * b.speed, life: range / b.speed + 3, dmg,
+                     pierce: b.pierce || 0, splash: b.splash || 0, color: b.color, big: !!b.splash, hit: [] });
+    }
+    sfx(w.type);
+  });
   // bullets
-  for (const b of Z.shots) {
-    b.x += b.vx; b.y += b.vy; b.life--;
+  for (const s of Z.shots) {
+    s.x += s.vx; s.y += s.vy; s.life--;
     for (const z of Z.zombies) {
-      if (z.hp > 0 && Math.hypot(z.x - b.x, z.y - b.y) < z.r + 4) {
-        z.hp -= Z.dmg; z.flash = 5; b.life = 0;
-        z.x += b.vx * (z.boss ? 0.05 : 0.35); z.y += b.vy * (z.boss ? 0.05 : 0.35);   // a little knockback
-        if (z.hp <= 0) zKill(z);
-        break;
+      if (z.hp > 0 && !s.hit.includes(z) && Math.hypot(z.x - s.x, z.y - s.y) < z.r + (s.big ? 7 : 4)) {
+        if (s.splash) {   // rocket: explode
+          for (const o of Z.zombies) if (o.hp > 0 && Math.hypot(o.x - s.x, o.y - s.y) < s.splash + o.r) zHit(o, s.dmg, 0, 0);
+          Z.booms.push({ x: s.x, y: s.y, r: s.splash, t: 16 }); sfx("boom"); s.life = 0; break;
+        }
+        zHit(z, s.dmg, s.vx * (z.boss ? .05 : .35), s.vy * (z.boss ? .05 : .35));
+        s.hit.push(z);
+        if (s.pierce-- <= 0) { s.life = 0; break; }
       }
     }
   }
+  for (const o of Z.booms) o.t--;
+  Z.booms = Z.booms.filter(o => o.t > 0);
+  for (const o of Z.slashes) o.t--;
+  Z.slashes = Z.slashes.filter(o => o.t > 0);
   Z.shots = Z.shots.filter(b => b.life > 0);
   Z.zombies = Z.zombies.filter(z => z.hp > 0);
 
@@ -838,8 +910,14 @@ function zStep() {
   if (Z.waveFrames <= 0 && !bossAlive) zWaveDone();
   if (Z.hp <= 0) zDead();
 }
+function zHit(z, dmg, kx, ky) {
+  if (z.hp <= 0) return;
+  z.hp -= dmg; z.flash = 5; z.x += kx; z.y += ky;   // a little knockback
+  if (z.hp <= 0) zKill(z);
+}
 function zKill(z) {
   Z.kills++; me.zKills = (me.zKills || 0) + 1; me.coins++; sfx("kill");
+  Z.cash += z.boss ? 30 : 1; sfx("cash");
   Z.splats.push({ x: z.x, y: z.y, r: z.r, t: 240 });
   if (z.boss) { me.zBosses = (me.zBosses || 0) + 1; toast("You beat the Boss Zombie!"); }
   if (me.zKills === 100 || me.zKills === 1000 || z.boss) checkAchievements();
@@ -850,23 +928,58 @@ function zWaveDone() {
   Z.hp = Math.min(Z.maxHp, Z.hp + Math.round(Z.maxHp * 0.15));
   if (Z.wave > (me.zBestWave || 0)) me.zBestWave = Z.wave;
   checkAchievements(); scheduleSave(true); renderZMine(); renderStats();
+  Z.cash += 5 + Z.wave;   // wave-clear bonus
   $("zTitle").textContent = "WAVE " + Z.wave + " CLEARED";
   const t = $("zText"); t.textContent = "";
-  const a = document.createElement("span"); a.textContent = "Pick an upgrade for wave " + (Z.wave + 1) + ". Kills this run: ";
+  const a = document.createElement("span"); a.textContent = "Pick 1 free upgrade, then spend your cash. Kills this run: ";
   const b = document.createElement("b"); b.textContent = Z.kills;
   t.append(a, b);
+  Z.picked = false;
   const ups = $("zUps"); ups.textContent = "";
   const pool = UPGRADES.slice().sort(() => Math.random() - .5).slice(0, 3);
   pool.forEach((u, i) => {
     const btn = document.createElement("button"); btn.type = "button"; btn.className = "up";
-    const k = document.createElement("kbd"); k.textContent = "Press " + (i + 1);
+    const k = document.createElement("kbd"); k.textContent = "Free · press " + (i + 1);
     const n = document.createElement("b"); n.textContent = u.n;
     const d = document.createElement("span"); d.textContent = u.d;
     btn.append(k, n, d);
-    btn.onclick = () => { u.f(); ups.textContent = ""; zStartWave(); };
+    btn.onclick = () => {
+      if (Z.picked) return;
+      Z.picked = true; u.f(); sfx("buy"); btn.classList.add("picked");
+      ups.querySelectorAll("button").forEach(x => { if (x !== btn) x.disabled = true; });
+      zHud(); renderZShop();
+    };
     ups.append(btn);
   });
-  $("zGo").hidden = true; $("zCard").hidden = false; zHud(); zDraw();
+  renderZShop();
+  $("zGo").textContent = "NEXT WAVE"; $("zGo").hidden = false; $("zCard").hidden = false; zHud(); zDraw();
+}
+function weaponIcon(cv, type) {   // a small picture of each weapon for the shop
+  const c = cv.getContext("2d"); c.setTransform(2, 0, 0, 2, 0, 0); c.clearRect(0, 0, 20, 20);
+  drawWeapon(c, type, 20, 20, -0.5, 1.6);
+}
+function renderZShop() {
+  const box = $("zShop"); box.textContent = "";
+  const h = document.createElement("h3"); const h1 = document.createElement("b"); h1.textContent = "WEAPON SHOP";
+  const h2 = document.createElement("span"); h2.textContent = "$" + Z.cash + " cash"; h.append(h1, h2); box.append(h);
+  for (const type of Object.keys(WEAPONS)) {
+    const b = WEAPONS[type], owned = Z.weapons.find(w => w.type === type);
+    const row = document.createElement("div"); row.className = "wrow";
+    const cv = document.createElement("canvas"); cv.width = 80; cv.height = 80; weaponIcon(cv, type);
+    const txt = document.createElement("div"); const nm = document.createElement("b");
+    nm.textContent = b.name + (owned ? " · Tier " + ROMAN[owned.tier] : "");
+    const ds = document.createElement("small"); ds.textContent = b.desc + (owned ? ` · ${Math.round(wStat(owned, "dmg"))} damage` : "");
+    txt.append(nm, ds);
+    const btn = document.createElement("button"); btn.type = "button";
+    if (owned) {
+      if (owned.tier >= MAX_TIER) { btn.textContent = "Maxed out"; btn.disabled = true; }
+      else { const cost = upgradeCost(owned); btn.textContent = `Upgrade to ${ROMAN[owned.tier + 1]} · $${cost}`; btn.disabled = Z.cash < cost;
+             btn.onclick = () => { if (Z.cash < cost) return; Z.cash -= cost; owned.tier++; sfx("buy"); renderZShop(); zHud(); }; }
+    } else if (Z.weapons.length >= MAX_WEAPONS) { btn.textContent = "No room (6 max)"; btn.disabled = true; }
+    else { btn.textContent = "Buy · $" + b.price; btn.disabled = Z.cash < b.price;
+           btn.onclick = () => { if (Z.cash < b.price) return; Z.cash -= b.price; Z.weapons.push({ type, tier: 1, cd: 20, aim: 0 }); sfx("buy"); renderZShop(); zHud(); zDraw(); }; }
+    row.append(cv, txt, btn); box.append(row);
+  }
 }
 function zDead() {
   Z.running = false; Z.phase = "dead";
@@ -876,7 +989,7 @@ function zDead() {
   const t = $("zText"); t.textContent = "";
   const parts = [["You reached ", "wave " + Z.wave], [" with ", Z.kills + " kills"], [". All-time kills: ", fmt(me.zKills)]];
   for (const [plain, bold] of parts) { const a = document.createElement("span"); a.textContent = plain; const b = document.createElement("b"); b.textContent = bold; t.append(a, b); }
-  $("zUps").textContent = ""; $("zGo").textContent = "PLAY AGAIN"; $("zGo").hidden = false; $("zCard").hidden = false;
+  $("zUps").textContent = ""; $("zShop").textContent = ""; $("zGo").textContent = "PLAY AGAIN"; $("zGo").hidden = false; $("zCard").hidden = false;
   zHud(); zDraw();
 }
 function zPause() {
@@ -884,10 +997,11 @@ function zPause() {
   Z.running = false; Z.phase = "paused";
   $("zTitle").textContent = "PAUSED";
   $("zText").textContent = "Wave " + Z.wave + " · " + Z.kills + " kills so far.";
-  $("zUps").textContent = ""; $("zGo").textContent = "RESUME"; $("zGo").hidden = false; $("zCard").hidden = false;
+  $("zUps").textContent = ""; $("zShop").textContent = ""; $("zGo").textContent = "RESUME"; $("zGo").hidden = false; $("zCard").hidden = false;
 }
 $("zGo").onclick = () => {
   if (Z && Z.phase === "paused") { Z.phase = "fight"; Z.running = true; $("zCard").hidden = true; zKick(); return; }
+  if (Z && Z.phase === "upgrade") { $("zUps").textContent = ""; $("zShop").textContent = ""; zStartWave(); return; }
   zNewRun(); zResize(); zStartWave();
 };
 function zHud() {
@@ -895,7 +1009,7 @@ function zHud() {
   const boss = Z.zombies.find(z => z.boss);
   $("zWave").textContent = (Z.wave % 5 === 0 ? "BOSS WAVE " : "WAVE ") + Z.wave;
   const secs = Math.ceil(Z.waveFrames / 60);
-  $("zInfo").textContent = (Z.waveFrames <= 0 && boss ? "Beat the boss!" : `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")} left`) + ` · ${Z.kills} kills`;
+  $("zInfo").textContent = (Z.waveFrames <= 0 && boss ? "Beat the boss!" : `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")} left`) + ` · ${Z.kills} kills · $${Z.cash}`;
   $("zHp").style.width = Math.max(0, Z.hp / Z.maxHp * 100) + "%";
   $("zHp").style.background = Z.hp / Z.maxHp < .3 ? "var(--red)" : "var(--good)";
   $("zHpText").textContent = `${Math.max(0, Math.ceil(Z.hp))} / ${Z.maxHp}`;
@@ -923,7 +1037,9 @@ function zDraw() {
     const x = w.x - camX, y = w.y - camY, s = 9; c.strokeStyle = (w.t >> 3) % 2 ? "#fa5252" : "#ffa8a8"; c.lineWidth = 4;
     c.beginPath(); c.moveTo(x - s, y - s); c.lineTo(x + s, y + s); c.moveTo(x + s, y - s); c.lineTo(x - s, y + s); c.stroke();
   }
-  for (const b of Z.shots) { c.fillStyle = "#ffd43b"; c.beginPath(); c.arc(b.x - camX, b.y - camY, 4, 0, 7); c.fill(); }
+  for (const b of Z.shots) { c.fillStyle = b.color || "#ffd43b"; c.beginPath(); c.arc(b.x - camX, b.y - camY, b.big ? 6 : 3.5, 0, 7); c.fill(); }
+  for (const o of Z.booms) { c.globalAlpha = o.t / 16; c.fillStyle = "#ffa94d"; c.beginPath(); c.arc(o.x - camX, o.y - camY, o.r * (1.2 - o.t / 40), 0, 7); c.fill();
+                             c.fillStyle = "#fff3bf"; c.beginPath(); c.arc(o.x - camX, o.y - camY, o.r * .45, 0, 7); c.fill(); c.globalAlpha = 1; }
   for (const z of Z.zombies) {
     const x = z.x - camX, y = z.y - camY; if (x < -60 || y < -60 || x > zW + 60 || y > zH + 60) continue;
     const a = Math.atan2(Z.py - z.y, Z.px - z.x), body = z.flash ? "#ffffff" : z.boss ? "#3f7a34" : "#69a85a";
@@ -947,11 +1063,32 @@ function zDraw() {
       c.save(); c.translate(ex, ey); c.rotate(a); c.fillStyle = "#fa5252"; c.beginPath(); c.moveTo(14, 0); c.lineTo(-8, -10); c.lineTo(-8, 10); c.closePath(); c.fill(); c.restore();
     }
   }
-  // you
+  // you, with your weapons floating around you
   if (!(Z.inv > 0 && (Z.inv >> 2) % 2)) {
     c.fillStyle = "#4dabf7"; c.strokeStyle = "#fff"; c.lineWidth = 3; c.beginPath(); c.arc(zW / 2, zH / 2, 14, 0, 7); c.fill(); c.stroke();
   }
-  c.strokeStyle = "rgba(255,255,255,.08)"; c.lineWidth = 1; c.beginPath(); c.arc(zW / 2, zH / 2, Z.range, 0, 7); c.stroke();   // your range
+  for (const o of Z.slashes) {
+    c.globalAlpha = o.t / 10; c.strokeStyle = "#fff"; c.lineWidth = 5; c.beginPath();
+    c.arc(o.x - camX, o.y - camY, o.r * .8, o.a - 1.1 + (10 - o.t) * .12, o.a + .4 + (10 - o.t) * .12); c.stroke(); c.globalAlpha = 1;
+  }
+  Z.weapons.forEach((w, i) => { const pos = weaponPos(i); drawWeapon(c, w.type, pos.x - camX, pos.y - camY, w.aim, 1.4, w.tier); });
+  const maxRange = Math.max(...Z.weapons.map(w => wStat(w, "range")));
+  c.strokeStyle = "rgba(255,255,255,.07)"; c.lineWidth = 1; c.beginPath(); c.arc(zW / 2, zH / 2, maxRange, 0, 7); c.stroke();   // your longest range
+}
+function drawWeapon(c, type, x, y, a, scale, tier) {
+  const col = WEAPONS[type].color;
+  c.save(); c.translate(x, y); c.rotate(a); c.scale(scale, scale);
+  if (Math.abs(((a % (2 * Math.PI)) + 3 * Math.PI) % (2 * Math.PI) - Math.PI) > Math.PI / 2) c.scale(1, -1);   // keep it right side up
+  c.lineJoin = "round"; c.strokeStyle = "#1b1b1b"; c.lineWidth = 1.5;
+  const box = (bx, by, w, h, fill) => { c.fillStyle = fill; c.fillRect(bx, by, w, h); c.strokeRect(bx, by, w, h); };
+  if (type === "sword") { box(-4, -1.5, 5, 3, "#8b5a2b"); box(1, -4, 2, 8, "#adb5bd"); c.fillStyle = col; c.beginPath(); c.moveTo(3, -2); c.lineTo(17, 0); c.lineTo(3, 2); c.closePath(); c.fill(); c.stroke(); }
+  else if (type === "pistol") { box(-4, -2.5, 12, 5, col); box(-4, 1, 4, 5, "#495057"); }
+  else if (type === "smg") { box(-6, -2.5, 15, 5, col); box(-1, 1, 3, 6, "#495057"); box(-6, -1, 3, 4, "#495057"); }
+  else if (type === "shotgun") { box(-7, -3, 18, 6, col); box(-7, -1, 6, 5, "#8b5a2b"); }
+  else if (type === "sniper") { box(-8, -2, 22, 4, col); box(-1, -5, 6, 3, "#343a40"); box(-8, 0, 5, 4, "#8b5a2b"); }
+  else if (type === "rocket") { box(-8, -3.5, 20, 7, col); box(10, -4.5, 3, 9, "#343a40"); }
+  if (tier > 1) { c.fillStyle = "#ffd43b"; for (let k = 1; k < tier; k++) { c.beginPath(); c.arc(-8 + k * 4, -7, 1.6, 0, 7); c.fill(); } }   // tier dots
+  c.restore();
 }
 function zKick() { if (!zLoopOn) { zLoopOn = true; zLast = performance.now(); zAcc = 0; requestAnimationFrame(zLoop); } }
 function zLoop(now) {
