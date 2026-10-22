@@ -90,6 +90,23 @@
   .confirm button, .linkbtn { font: 600 13px var(--font-body); border: 0; border-radius: 8px; padding: 6px 10px; cursor: pointer; }
   .linkbtn { background: none; color: var(--muted); text-decoration: underline; padding: 0; }
   .screen[hidden] { display: none !important; }
+  .app.three { grid-template-columns: 270px minmax(0, 1fr) 340px; }
+  .achside { background: var(--panel); border-right: 2px solid var(--panel-line); display: flex; flex-direction: column; gap: 12px; min-height: 0; min-width: 0;
+             padding: 60px 14px 16px max(14px, env(safe-area-inset-left, 0px)); overflow-y: auto; }
+  .achhead { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .achhead b { font-family: var(--font-display); font-weight: 400; font-size: 18px; letter-spacing: 1px; }
+  .achhead span { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+  .nextach { background: rgba(255, 212, 59, .12); border: 1px solid rgba(255, 212, 59, .5); border-radius: 12px; padding: 10px 12px; display: grid; gap: 6px; }
+  .nextach span { color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; }
+  .nextach b { color: var(--gold); font-size: 17px; font-variant-numeric: tabular-nums; }
+  .nextach .bar { height: 8px; } .nextach .bar i { background: var(--gold); }
+  .nextach small { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .achside .ach { grid-template-columns: 1fr; gap: 6px; }
+  .achside .badge { padding: 8px 10px; }
+  .achside .note { margin: 4px 0 0; }
+  .soundbtn { position: fixed; z-index: 6; left: max(12px, env(safe-area-inset-left, 0px)); bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+              background: rgba(0, 0, 0, .35); color: var(--text); border: 0; border-radius: 10px; padding: 7px 11px; font: 600 13px var(--font-body); cursor: pointer; }
+  .soundbtn:focus-visible { outline: 2px solid var(--gold); }
   #screen-title { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 26px; text-align: center;
                   padding-block: 20px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
                   background: radial-gradient(circle at 50% 40%, #1f6be0, var(--field) 55%, var(--field-deep)); overflow-y: auto; }
@@ -146,12 +163,15 @@
     .stage { min-height: 78vh; padding-right: max(16px, env(safe-area-inset-right, 0px)); }
     .side { border-left: 0; border-top: 2px solid var(--panel-line); padding-left: max(0px, env(safe-area-inset-left, 0px)); }
     .pane { overflow: visible; }
+    .app.three { grid-template-columns: 1fr; }
+    .app.three .stage { order: 1; } .app.three .achside { order: 2; padding-top: 16px; border-right: 0; border-top: 2px solid var(--panel-line); overflow: visible; } .app.three .side { order: 3; }
     .dotfield, .zfield { min-height: 72vh; }
   }
   @media (prefers-reduced-motion: reduce) { #box { transition: none; } .toast { animation: none; } }
 </style>
 
 <canvas id="fx"></canvas>
+<button class="soundbtn" id="soundBtn" type="button">🔊 Sound on</button>
 <main id="screen-title" class="screen">
   <h1>CLICK <span>ARCADE</span></h1>
   <div class="picks" role="listbox" aria-label="Pick a game">
@@ -161,20 +181,26 @@
   </div>
   <div class="hint">Arrow keys to pick, Enter to play · Esc goes back here</div>
 </main>
-<div class="app screen" id="screen-clicker" hidden>
+<div class="app three screen" id="screen-clicker" hidden>
   <button class="back" type="button" data-back>← Games</button>
+  <aside class="achside" aria-label="Achievements">
+    <div class="achhead"><b>ACHIEVEMENTS</b><span id="achCount"></span></div>
+    <div class="nextach"><span>Next achievement</span><b id="nextName">500 clicks</b><div class="bar"><i id="nextFill"></i></div><small id="nextText">500 to go</small></div>
+    <div class="ach" id="ach"></div>
+    <p class="note">Left and right clicks both count. Clicks faster than 25 a second don't count, so autoclickers can't win.</p>
+    <div id="resetArea"><button class="linkbtn" id="reset" type="button">Start over</button></div>
+  </aside>
   <section class="stage" aria-label="Click area">
     <div class="cps"><b id="cps">CPS: 0</b><span id="bestCps">Best CPS: 0</span></div>
     <button id="box" type="button" aria-label="Click me">CLICK ME</button>
     <div class="tally"><b id="total">0</b><span>clicks</span></div>
-    <div class="goal"><div class="bar"><i id="fill"></i></div><p id="goalText">0 / 20,000,000 clicks</p></div>
+    <div class="goal"><div class="bar"><i id="fill"></i></div><p id="goalText">0 / 500 clicks to the next achievement</p></div>
     <div class="chips"><span class="chip gold" id="coins">0 coins</span><span class="chip" id="streak">No streak yet</span><span class="chip" id="score">Score 0</span></div>
   </section>
   <aside class="side">
-    <div class="tabs" role="tablist">
+    <div class="tabs" role="tablist" style="grid-template-columns:repeat(2,1fr)">
       <button role="tab" id="tab-board" aria-selected="true">Leaderboard</button>
       <button role="tab" id="tab-shop" aria-selected="false">Shop</button>
-      <button role="tab" id="tab-ach" aria-selected="false">Achievements</button>
     </div>
     <div class="pane" id="pane-board">
       <div class="namebar"><label>Your name on the boards <input class="nameIn" maxlength="16" placeholder="Type your name" autocomplete="nickname"></label></div>
@@ -185,12 +211,6 @@
     <div class="pane" id="pane-shop" hidden>
       <p class="note">Every click earns 1 coin. Spend coins on click animations. Spending never lowers your clicks or score.</p>
       <div class="shop" id="shop"></div>
-    </div>
-    <div class="pane" id="pane-ach" hidden>
-      <p class="note" id="achCount"></p>
-      <div class="ach" id="ach"></div>
-      <p class="note" style="margin-top:18px">Left and right clicks both count. Clicks faster than 25 a second don't count, so autoclickers can't win.</p>
-      <div id="resetArea"><button class="linkbtn" id="reset" type="button">Start over</button></div>
     </div>
   </aside>
 </div>
@@ -242,7 +262,7 @@
 
 <script>
 "use strict";
-const GOAL = 20000000, MAX_CPS = 25, DECAY = 0.9;
+const MAX_CPS = 25, DECAY = 0.9;
 const $ = id => document.getElementById(id);
 const fmt = n => Math.floor(n).toLocaleString("en-US");
 const short = n => n >= 1e6 ? (n / 1e6).toLocaleString("en-US", { maximumFractionDigits: 1 }) + "M" : n >= 1e3 ? (n / 1e3).toLocaleString("en-US", { maximumFractionDigits: 1 }) + "K" : String(n);
@@ -299,9 +319,12 @@ addEventListener("pagehide", () => { local(false); });
 document.addEventListener("visibilitychange", () => { if (document.hidden) { clearTimeout(saveTimer); save(); } });
 
 // ---------------------------------------------------------------- achievements
-const CLICK_GOALS = [500, 1000, 2500, 5000, 10000, 25000, 50000, 100000, 250000, 500000, 1e6, 2.5e6, 5e6, 1e7, 2e7];
+const CLICK_GOALS = [500, 1000, 2500, 5000, 10000, 25000, 50000, 100000, 250000, 500000, 1e6, 2.5e6, 5e6, 1e7, 2e7, 5e7, 1e8, 2.5e8, 5e8, 1e9];
+// past the list, every doubling is the next goal: 2 billion, 4 billion, ...
+function goalAfter(c) { for (const g of CLICK_GOALS) if (g > c) return g; let g = CLICK_GOALS[CLICK_GOALS.length - 1]; while (g <= c) g *= 2; return g; }
+function goalBefore(c) { let lo = 0; for (const g of CLICK_GOALS) if (g <= c) lo = g; let g = CLICK_GOALS[CLICK_GOALS.length - 1]; while (g * 2 <= c) { g *= 2; lo = g; } return lo; }
 const ACHIEVEMENTS = [
-  ...CLICK_GOALS.map(n => ({ id: "c" + n, name: fmt(n) + " clicks", desc: n === GOAL ? "The 20 million finish line" : "Click " + fmt(n) + " times", test: () => me.clicks >= n })),
+  ...CLICK_GOALS.map(n => ({ id: "c" + n, name: fmt(n) + " clicks", desc: "Click " + fmt(n) + " times", test: () => me.clicks >= n })),
   { id: "s3", name: "3-day streak", desc: "Play 3 days in a row", test: () => me.streak >= 3 },
   { id: "s7", name: "7-day streak", desc: "Play a whole week in a row", test: () => me.streak >= 7 },
   { id: "s30", name: "30-day streak", desc: "Play 30 days in a row", test: () => me.streak >= 30 },
@@ -319,8 +342,8 @@ const ACHIEVEMENTS = [
 ];
 let unlocked = new Set();
 function checkAchievements(quiet) {
-  for (const a of ACHIEVEMENTS) if (!unlocked.has(a.id) && a.test()) { unlocked.add(a.id); if (!quiet) toast("Achievement: " + a.name + "!"); }
-  if (!$("pane-ach").hidden) renderAch();
+  for (const a of ACHIEVEMENTS) if (!unlocked.has(a.id) && a.test()) { unlocked.add(a.id); if (!quiet) { toast("Achievement: " + a.name + "!"); sfx("ach"); } }
+  renderAch();
 }
 function renderAch() {
   $("achCount").textContent = `${unlocked.size} of ${ACHIEVEMENTS.length} unlocked`;
@@ -338,6 +361,38 @@ function toast(text) {
   const t = document.createElement("div"); t.className = "toast"; t.textContent = text; document.body.append(t);
   clearTimeout(toastTimer); toastTimer = setTimeout(() => t.remove(), 2600);
 }
+
+// ---------------------------------------------------------------- sounds (made in the browser, no files)
+let sfxOn = true, actx = null;
+try { sfxOn = localStorage.getItem("arcade-sound") !== "off"; } catch (e) {}
+const SFX = {   // [wave, start Hz, end Hz, seconds, volume]
+  click: [["square", 1700, 700, .045, .045]],
+  pop: [["sine", 520, 1250, .09, .09]],
+  miss: [["sawtooth", 220, 70, .32, .06]],
+  buy: [["triangle", 660, 660, .1, .08], ["triangle", 990, 990, .16, .08, .1]],
+  ach: [["triangle", 523, 523, .12, .08], ["triangle", 659, 659, .12, .08, .1], ["triangle", 784, 784, .22, .08, .2]],
+  kill: [["square", 300, 90, .07, .025]],
+  hurt: [["sawtooth", 140, 90, .15, .05]],
+};
+function sfx(name) {
+  if (!sfxOn) return;
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    if (actx.state === "suspended") actx.resume();
+    for (const [type, f1, f2, dur, vol, delay = 0] of SFX[name]) {
+      const t = actx.currentTime + delay, o = actx.createOscillator(), g = actx.createGain();
+      o.type = type; o.frequency.setValueAtTime(f1, t); o.frequency.exponentialRampToValueAtTime(f2, t + dur);
+      g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+      o.connect(g).connect(actx.destination); o.start(t); o.stop(t + dur + .02);
+    }
+  } catch (e) {}
+}
+function showSound() { $("soundBtn").textContent = sfxOn ? "🔊 Sound on" : "🔇 Sound off"; }
+function toggleSound() { sfxOn = !sfxOn; try { localStorage.setItem("arcade-sound", sfxOn ? "on" : "off"); } catch (e) {} showSound(); if (sfxOn) sfx("click"); }
+$("soundBtn").onclick = toggleSound;
+addEventListener("keydown", e => { if (e.key.toLowerCase() === "m" && !(e.target instanceof HTMLInputElement)) toggleSound(); });
+document.addEventListener("visibilitychange", () => { if (actx) document.hidden ? actx.suspend() : actx.resume(); });
+showSound();
 
 // ---------------------------------------------------------------- click animations (shop items)
 const fx = $("fx"), g = fx.getContext("2d");
@@ -406,7 +461,6 @@ setInterval(() => { $("cps").textContent = "CPS: " + cpsNow(); }, 100);
 function click(e) {
   if (e.button !== 0 && e.button !== 2) return;
   e.preventDefault();
-  if (me.clicks >= GOAL) return;
   if (cpsNow() >= MAX_CPS) return;                     // faster than a person can click: doesn't count
   recent.push(performance.now());
   newDayCheck();
@@ -415,8 +469,9 @@ function click(e) {
   box.classList.add("down"); setTimeout(() => box.classList.remove("down"), 70);
   const anim = ANIMS.find(a => a.id === me.equipped) || ANIMS[0];
   if (!reduced) { anim.run(e.clientX, e.clientY); if (anim.id !== "classic" && Math.random() < .5) ANIMS[0].run(e.clientX, e.clientY); }
+  sfx("click");
   if (CLICK_GOALS.includes(me.clicks) || c === 10 || c === 15 || c === 20) checkAchievements();
-  if (me.clicks >= GOAL) showWin();
+  else if (me.clicks > CLICK_GOALS[CLICK_GOALS.length - 1] && goalBefore(me.clicks) === me.clicks) { toast("Achievement: " + fmt(me.clicks) + " clicks!"); sfx("ach"); }
   scheduleSave(false); renderStats();
 }
 box.addEventListener("mousedown", click);
@@ -425,8 +480,10 @@ addEventListener("contextmenu", e => { if (e.target === box || box.contains(e.ta
 
 function renderStats() {
   $("total").textContent = fmt(me.clicks);
-  $("fill").style.width = (me.clicks / GOAL * 100) + "%";
-  $("goalText").textContent = `${fmt(me.clicks)} / ${fmt(GOAL)} clicks`;
+  const lo = goalBefore(me.clicks), hi = goalAfter(me.clicks), frac = (me.clicks - lo) / (hi - lo) * 100 + "%";
+  $("fill").style.width = frac; $("nextFill").style.width = frac;
+  $("goalText").textContent = `${fmt(me.clicks)} / ${fmt(hi)} clicks to the next achievement`;
+  $("nextName").textContent = fmt(hi) + " clicks"; $("nextText").textContent = fmt(hi - me.clicks) + " to go";
   $("bestCps").textContent = "Best CPS: " + me.bestCps;
   $("coins").textContent = fmt(me.coins) + " coins";
   const st = me.day && daysSince(me.day) <= 1 ? me.streak : 0;
@@ -470,7 +527,7 @@ function shopClick(a) {
   if (me.equipped === a.id) return;
   if (!me.owned.includes(a.id)) {
     if (me.coins < a.price) return;
-    me.coins -= a.price; me.owned = me.owned.concat(a.id); toast("You bought " + a.name + "!");
+    me.coins -= a.price; me.owned = me.owned.concat(a.id); toast("You bought " + a.name + "!"); sfx("buy");
     checkAchievements();
   }
   me.equipped = a.id; scheduleSave(true); renderStats(); renderShopButtons();
@@ -549,11 +606,10 @@ async function renderBoard() {
 }
 
 // ---------------------------------------------------------------- tabs
-const TABS = ["board", "shop", "ach"];
+const TABS = ["board", "shop"];
 function showTab(name) {
   for (const t of TABS) { $("tab-" + t).setAttribute("aria-selected", String(t === name)); $("pane-" + t).hidden = t !== name; }
   if (name === "shop") renderShop();
-  if (name === "ach") renderAch();
   try { localStorage.setItem("click-me-tab", name); } catch (e) {}
 }
 TABS.forEach(t => $("tab-" + t).onclick = () => showTab(t));
@@ -628,7 +684,7 @@ function dotHalt() { dotAlive = false; clearTimeout(dotTimer); cancelAnimationFr
 function dotQuit() { if (dotAlive) dotOver("Run ended"); }
 function dotOver(why) {
   if (!dotAlive) return;
-  dotHalt();
+  dotHalt(); sfx("miss");
   me.dotGames = (me.dotGames || 0) + 1;
   const isBest = dotRun > (me.dotBest || 0);
   if (isBest) me.dotBest = dotRun;
@@ -646,7 +702,7 @@ dot.addEventListener("mousedown", e => {
   if (e.button !== 0 && e.button !== 2) return;
   e.preventDefault(); e.stopPropagation();
   if (!dotAlive) return;
-  dotRun++; me.coins += 2;
+  dotRun++; me.coins += 2; sfx("pop");
   const anim = ANIMS.find(a => a.id === me.equipped) || ANIMS[0];
   if (!reduced) anim.run(e.clientX, e.clientY);
   renderDotStats(); placeDot();
@@ -758,7 +814,7 @@ function zStep() {
     const dx = Z.px - z.x, dy = Z.py - z.y, d = Math.hypot(dx, dy) || 1;
     z.x += dx / d * z.speed; z.y += dy / d * z.speed;
     if (z.flash > 0) z.flash--;
-    if (d < z.r + 14 && Z.inv <= 0) { Z.hp -= z.dmg; Z.inv = 40; }
+    if (d < z.r + 14 && Z.inv <= 0) { Z.hp -= z.dmg; Z.inv = 40; sfx("hurt"); }
   }
   for (let i = 0; i < Z.zombies.length; i++) for (let j = i + 1; j < Z.zombies.length; j++) {
     const a = Z.zombies[i], b = Z.zombies[j], dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy), min = a.r + b.r;
@@ -783,7 +839,7 @@ function zStep() {
   if (Z.hp <= 0) zDead();
 }
 function zKill(z) {
-  Z.kills++; me.zKills = (me.zKills || 0) + 1; me.coins++;
+  Z.kills++; me.zKills = (me.zKills || 0) + 1; me.coins++; sfx("kill");
   Z.splats.push({ x: z.x, y: z.y, r: z.r, t: 240 });
   if (z.boss) { me.zBosses = (me.zBosses || 0) + 1; toast("You beat the Boss Zombie!"); }
   if (me.zKills === 100 || me.zKills === 1000 || z.boss) checkAchievements();

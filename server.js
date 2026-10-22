@@ -75,9 +75,9 @@ function arcadeClean(body) {
   if (!/^[a-z0-9-]{16,64}$/i.test(id)) return null;
   const name = String(body.name || "").replace(/[^\p{L}\p{N} _.-]/gu, "").replace(/\s+/g, " ").trim().slice(0, 16);
   const s = body.stats || {};
-  const clicks = num(s.clicks, 20000000);
+  const clicks = num(s.clicks, 1e12);   // no top limit in the game any more (25 clicks a second max)
   return { id, row: {
-    name, clicks, points: Math.min(clicks, num(s.points, 20000000)),
+    name, clicks, points: Math.min(clicks, num(s.points, 1e12)),
     day: /^\d{4}-\d\d-\d\d$/.test(String(s.day || "")) ? String(s.day) : "",
     streak: num(s.streak, 5000), bestCps: num(s.bestCps, 25),
     dotBest: num(s.dotBest, 1000), dotGames: num(s.dotGames, 1000000),
