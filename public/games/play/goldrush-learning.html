@@ -1,0 +1,504 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Gold Rush Learning</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { --paper: #fbf5e6; --ink: #3b2a1a; --gold: #d4a017; --gold2: #f4c542; --brown: #8b5a2b; --green: #2f9e44; --red: #c92a2a; --blue: #1c7ed6; --card: #fffdf6; --line: #e3d5b5; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); font-family: "Segoe UI", "Trebuchet MS", system-ui, sans-serif; font-size: 18px; line-height: 1.5; }
+  header { background: linear-gradient(#5a3a1a, #3b2a1a); color: #fff; padding: 12px 20px; display: flex; align-items: center; gap: 14px; position: sticky; top: 0; z-index: 3; }
+  header h1 { font-size: 24px; margin: 0; flex: 1; letter-spacing: .5px; }
+  header h1 span { color: var(--gold2); }
+  main { max-width: 980px; margin: 0 auto; padding: 18px 16px 50px; }
+  button { font: inherit; cursor: pointer; border-radius: 10px; border: 0; padding: 10px 18px; font-weight: 600; }
+  .btn { background: var(--brown); color: #fff; }
+  .btn:hover { filter: brightness(1.1); }
+  .btn.gold { background: var(--gold); color: #3b2a1a; }
+  .btn.green { background: var(--green); }
+  .btn.ghost { background: transparent; color: #fff; border: 2px solid rgba(255,255,255,.6); }
+  .btn:disabled { opacity: .45; cursor: not-allowed; filter: none; }
+  .progress { background: var(--card); border: 2px solid var(--line); border-radius: 14px; padding: 14px 18px; margin-bottom: 18px; }
+  .bar { height: 18px; background: #eadfc4; border-radius: 9px; overflow: hidden; margin-top: 6px; }
+  .bar div { height: 100%; background: linear-gradient(90deg, var(--gold), var(--gold2)); transition: width .4s; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+  .card { background: var(--card); border: 2px solid var(--line); border-radius: 14px; overflow: hidden; cursor: pointer; transition: transform .1s, box-shadow .1s; position: relative; }
+  .card:hover { transform: translateY(-3px); box-shadow: 0 6px 16px rgba(80,50,10,.18); }
+  .card .pic { height: 150px; background: #dfeaf2; }
+  .card .pic svg { width: 100%; height: 100%; display: block; }
+  .card .body { padding: 10px 14px 14px; }
+  .card .num { font-size: 13px; color: var(--brown); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+  .card h3 { margin: 2px 0 6px; font-size: 20px; }
+  .tag { display: inline-block; font-size: 14px; font-weight: 700; padding: 2px 10px; border-radius: 20px; }
+  .tag.new { background: #e7f0ff; color: var(--blue); }
+  .tag.done { background: #e3f6e6; color: var(--green); }
+  .tag.locked { background: #eee; color: #777; }
+  .card.quiz { border-color: var(--gold); }
+  .card.locked { cursor: not-allowed; }
+  .card.locked .pic { filter: grayscale(1) opacity(.55); }
+  .lesson { background: var(--card); border: 2px solid var(--line); border-radius: 16px; padding: 22px 26px; }
+  .lesson h2 { margin: 0 0 4px; font-size: 30px; }
+  .lesson .sub { color: var(--brown); font-weight: 700; margin-bottom: 12px; }
+  .figure { border-radius: 12px; overflow: hidden; border: 2px solid var(--line); margin: 14px 0 6px; background: #dfeaf2; }
+  .figure svg { width: 100%; height: auto; display: block; }
+  .caption { font-size: 15px; color: #6b5640; text-align: center; margin-bottom: 14px; font-style: italic; }
+  .lesson p { margin: 10px 0; }
+  .words { background: #fff4d6; border: 2px dashed var(--gold); border-radius: 12px; padding: 10px 16px; margin: 16px 0; }
+  .words h4 { margin: 0 0 4px; }
+  .words dt { font-weight: 700; display: inline; }
+  .words dd { display: inline; margin: 0; }
+  .words div { margin: 3px 0; }
+  .check { background: #eef6ff; border: 2px solid #b9d6f5; border-radius: 12px; padding: 14px 18px; margin-top: 18px; }
+  .check h3 { margin: 0 0 6px; }
+  .q { margin: 12px 0; }
+  .q .qt { font-weight: 700; }
+  .opt { display: block; padding: 6px 10px; margin: 4px 0; border-radius: 8px; background: #fff; border: 2px solid #d6e4f2; cursor: pointer; }
+  .opt:hover { border-color: var(--blue); }
+  .opt input { margin-right: 8px; transform: scale(1.2); }
+  .opt.right { border-color: var(--green); background: #e9f9ec; }
+  .opt.wrong { border-color: var(--red); background: #fdecec; }
+  textarea { width: 100%; min-height: 80px; font: inherit; padding: 8px 10px; border-radius: 8px; border: 2px solid #d6e4f2; }
+  .msg { font-weight: 700; margin: 10px 0 0; min-height: 26px; }
+  .msg.bad { color: var(--red); } .msg.good { color: var(--green); }
+  .stamp { display: inline-block; border: 4px solid var(--green); color: var(--green); font-weight: 900; font-size: 26px; padding: 4px 16px; border-radius: 10px; transform: rotate(-6deg); margin: 10px 0; letter-spacing: 2px; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 14px; }
+  .quizbox { background: var(--card); border: 3px solid var(--gold); border-radius: 16px; padding: 22px 26px; }
+  .quizbox .count { color: var(--brown); font-weight: 700; }
+  .quizbox .qt { font-size: 22px; font-weight: 700; margin: 8px 0 12px; }
+  .big { font-size: 40px; font-weight: 900; color: var(--brown); }
+  .stars { font-size: 40px; letter-spacing: 4px; }
+  .review div { margin: 6px 0; padding: 6px 10px; border-radius: 8px; background: #fff; border: 1px solid var(--line); }
+  .cert { background: #fffaf0; border: 10px double var(--gold); border-radius: 8px; padding: 30px; text-align: center; margin-top: 16px; }
+  .cert h2 { font-family: Georgia, serif; font-size: 34px; margin: 6px 0; color: var(--brown); }
+  .cert .who { font-family: Georgia, serif; font-size: 32px; border-bottom: 2px solid var(--ink); display: inline-block; min-width: 60%; margin: 10px 0; }
+  .muted { color: #8a7660; font-size: 15px; }
+  .hidden { display: none !important; }
+  input[type=text] { font: inherit; padding: 6px 10px; border-radius: 8px; border: 2px solid var(--line); }
+  #launch { position: fixed; inset: 0; background: rgba(40,25,10,.85); display: none; align-items: center; justify-content: center; z-index: 9; }
+  #launch .box { background: var(--card); border-radius: 14px; padding: 22px; width: 380px; text-align: center; border: 3px solid var(--gold); }
+  @media print {
+    header, .noprint, .row { display: none !important; }
+    body { background: #fff; }
+    .cert { border-color: #b8860b; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <svg width="40" height="40" viewBox="0 0 40 40" aria-hidden="true"><ellipse cx="20" cy="24" rx="18" ry="9" fill="#9a9a9a"/><ellipse cx="20" cy="22" rx="14" ry="6" fill="#c8c8c8"/><circle cx="16" cy="21" r="2.5" fill="#f4c542"/><circle cx="22" cy="23" r="2" fill="#f4c542"/><circle cx="25" cy="20" r="1.5" fill="#f4c542"/></svg>
+  <h1>Gold Rush <span>Learning</span></h1>
+  <button class="btn ghost noprint" id="homeBtn">Home</button>
+</header>
+<main id="main"></main>
+
+<div id="launch"><div class="box">
+  <h2 style="margin:0 0 4px">Gold Rush Learning</h2>
+  <div class="muted" style="margin-bottom:14px">Lessons about the California Gold Rush, then the quiz.</div>
+  <div class="row" style="justify-content:center"><button class="btn green" data-act="open">Open</button><button class="btn" data-act="cancel">Cancel</button><button class="btn" data-act="uninstall">Uninstall</button></div>
+  <div id="launchMsg" class="muted" style="margin-top:10px"></div>
+</div></div>
+
+<script>
+"use strict";
+// Set to true in copies that have no Windows/Mac start-up box (Chromebook): shows Open / Cancel / Uninstall in the page.
+const LAUNCH_MENU = false;
+
+// ====================================================================== pictures (drawn with SVG)
+const PICS = {
+  village: `<svg viewBox="0 0 600 300" xmlns="http://www.w3.org/2000/svg">
+    <rect width="600" height="300" fill="#bfe3f5"/><circle cx="520" cy="60" r="32" fill="#ffd95a"/>
+    <path d="M0 170 Q120 120 250 160 T600 150 V300 H0Z" fill="#9cc77a"/><path d="M0 200 Q150 170 300 200 T600 195 V300 H0Z" fill="#7db35b"/>
+    <path d="M0 265 Q150 245 300 262 T600 255 V300 H0Z" fill="#4a90c8"/><path d="M60 270 q10 -8 20 0 q-10 8 -20 0z M300 268 q10 -8 20 0 q-10 8 -20 0z" fill="#e8805a"/>
+    <rect x="455" y="120" width="18" height="90" fill="#6b4423"/><circle cx="440" cy="110" r="38" fill="#4f8a3a"/><circle cx="485" cy="100" r="42" fill="#5c9a45"/><circle cx="465" cy="80" r="34" fill="#68a64f"/>
+    <g fill="#8b5a2b"><ellipse cx="430" cy="128" rx="4" ry="6"/><ellipse cx="495" cy="118" rx="4" ry="6"/><ellipse cx="470" cy="95" rx="4" ry="6"/></g>
+    <polygon points="150,215 200,105 250,215" fill="#8b5a2b"/><polygon points="160,215 200,120 240,215" fill="#a0693a"/><g stroke="#6b4423" stroke-width="3"><line x1="185" y1="140" x2="168" y2="215"/><line x1="200" y1="120" x2="200" y2="215"/><line x1="215" y1="140" x2="232" y2="215"/></g>
+    <polygon points="188,215 200,185 212,215" fill="#3b2a1a"/>
+    <rect x="300" y="160" width="6" height="55" fill="#6b4423"/><rect x="330" y="160" width="6" height="55" fill="#6b4423"/><ellipse cx="318" cy="150" rx="30" ry="34" fill="#c9a26b"/><path d="M290 140 h56 M292 155 h52 M296 170 h44" stroke="#8b5a2b" stroke-width="3"/>
+    <ellipse cx="100" cy="222" rx="26" ry="12" fill="#c9a26b"/><path d="M76 222 q24 30 48 0" fill="#b88a50"/><path d="M80 226 h40 M84 232 h32" stroke="#7a4f22" stroke-width="2"/>
+    <text x="16" y="34" font-family="Segoe UI, sans-serif" font-size="20" font-weight="700" fill="#3b2a1a">Oak tree with acorns · bark house · acorn granary · basket</text></svg>`,
+  mill: `<svg viewBox="0 0 600 300" xmlns="http://www.w3.org/2000/svg">
+    <rect width="600" height="300" fill="#cfe8f7"/><path d="M0 130 L90 60 L170 120 L260 50 L360 125 L450 70 L600 130 V300 H0Z" fill="#7a9a6a"/>
+    <g fill="#2f6b3a"><polygon points="40,150 55,105 70,150"/><polygon points="520,150 535,100 550,150"/><polygon points="560,155 572,118 584,155"/></g>
+    <path d="M0 180 H600 V300 H0Z" fill="#9c7a4c"/><path d="M0 215 Q150 200 300 220 T600 212 V262 Q450 250 300 268 T0 258Z" fill="#4a90c8"/>
+    <g fill="#b07a40" stroke="#6b4423" stroke-width="3"><rect x="170" y="110" width="200" height="90"/><polygon points="160,112 270,70 380,112"/></g>
+    <g stroke="#6b4423" stroke-width="3"><line x1="210" y1="110" x2="210" y2="200"/><line x1="250" y1="110" x2="250" y2="200"/><line x1="290" y1="110" x2="290" y2="200"/><line x1="330" y1="110" x2="330" y2="200"/></g>
+    <rect x="360" y="196" width="140" height="18" fill="#7a5530"/><path d="M370 214 H500" stroke="#4a90c8" stroke-width="10"/>
+    <circle cx="430" cy="240" r="7" fill="#f4c542" stroke="#b8860b" stroke-width="2"/><path d="M430 222 v-8 M445 228 l6 -6 M415 228 l-6 -6 M448 240 h8 M412 240 h-8" stroke="#f4c542" stroke-width="3"/>
+    <rect x="40" y="200" width="120" height="44" rx="6" fill="#fff8e1" stroke="#8b5a2b" stroke-width="3"/><text x="100" y="220" text-anchor="middle" font-family="Georgia, serif" font-size="15" font-weight="700" fill="#3b2a1a">Coloma</text><text x="100" y="238" text-anchor="middle" font-family="Georgia, serif" font-size="14" fill="#3b2a1a">Jan. 24, 1848</text>
+    <text x="16" y="30" font-family="Segoe UI, sans-serif" font-size="20" font-weight="700" fill="#3b2a1a">Sutter's sawmill on the American River</text></svg>`,
+  routes: `<svg viewBox="0 0 600 340" xmlns="http://www.w3.org/2000/svg">
+    <rect width="600" height="340" fill="#9fd0ef"/>
+    <path d="M150 20 L330 18 L360 60 L340 95 L300 110 L285 140 L250 150 L232 175 L212 160 L180 140 L150 110 L128 70Z" fill="#b8d68f" stroke="#6a8a4a" stroke-width="2"/>
+    <path d="M232 175 L250 182 L262 192 L270 200 L262 206 L248 196 L238 186Z" fill="#b8d68f" stroke="#6a8a4a" stroke-width="2"/>
+    <path d="M262 206 L300 210 L340 230 L345 260 L320 290 L298 318 L286 330 L280 300 L270 260 L262 230Z" fill="#b8d68f" stroke="#6a8a4a" stroke-width="2"/>
+    <circle cx="160" cy="95" r="6" fill="#c92a2a"/><text x="96" y="90" font-family="Segoe UI" font-size="14" font-weight="700" fill="#3b2a1a">California</text>
+    <circle cx="300" cy="80" r="5" fill="#3b2a1a"/><text x="306" y="76" font-family="Segoe UI" font-size="13" fill="#3b2a1a">Missouri</text>
+    <circle cx="350" cy="62" r="5" fill="#3b2a1a"/><text x="356" y="58" font-family="Segoe UI" font-size="13" fill="#3b2a1a">East Coast</text>
+    <path d="M300 80 C260 70 210 75 160 95" fill="none" stroke="#8b5a2b" stroke-width="5" stroke-dasharray="10 6"/>
+    <path d="M355 66 C420 120 400 200 370 260 C350 310 300 335 270 330 C240 320 200 250 180 180 C170 140 160 110 158 100" fill="none" stroke="#1c4fa0" stroke-width="4"/>
+    <path d="M355 66 C430 110 380 180 296 196 L250 200 C205 190 172 150 160 102" fill="none" stroke="#2f9e44" stroke-width="4" stroke-dasharray="3 6" stroke-linecap="round"/>
+    <rect x="410" y="150" width="180" height="110" rx="10" fill="#fff" opacity=".92"/>
+    <g font-family="Segoe UI" font-size="14" fill="#3b2a1a"><line x1="422" y1="175" x2="452" y2="175" stroke="#8b5a2b" stroke-width="5" stroke-dasharray="8 5"/><text x="460" y="180">By land (wagon)</text>
+    <line x1="422" y1="205" x2="452" y2="205" stroke="#1c4fa0" stroke-width="4"/><text x="460" y="210">Around Cape Horn</text>
+    <line x1="422" y1="235" x2="452" y2="235" stroke="#2f9e44" stroke-width="4" stroke-dasharray="3 6" stroke-linecap="round"/><text x="460" y="240">Panama shortcut</text></g>
+    <text x="250" y="232" font-family="Segoe UI" font-size="12" font-weight="700" fill="#2f6b3a">Panama</text><text x="236" y="336" font-family="Segoe UI" font-size="12" font-weight="700" fill="#1c4fa0">Cape Horn</text>
+    <text x="16" y="30" font-family="Segoe UI, sans-serif" font-size="20" font-weight="700" fill="#3b2a1a">Three ways to get to California</text></svg>`,
+  tools: `<svg viewBox="0 0 600 300" xmlns="http://www.w3.org/2000/svg">
+    <rect width="600" height="300" fill="#efe3c8"/><path d="M0 240 H600 V300 H0Z" fill="#c9a26b"/>
+    <ellipse cx="110" cy="190" rx="80" ry="26" fill="#7d7d7d"/><ellipse cx="110" cy="184" rx="66" ry="18" fill="#a9a9a9"/><ellipse cx="110" cy="186" rx="44" ry="10" fill="#6a5a45"/>
+    <g fill="#f4c542" stroke="#b8860b"><circle cx="100" cy="186" r="4"/><circle cx="116" cy="188" r="3"/><circle cx="124" cy="184" r="2.5"/></g>
+    <text x="110" y="240" text-anchor="middle" font-family="Segoe UI" font-size="18" font-weight="700" fill="#3b2a1a">Gold pan</text>
+    <g fill="#b07a40" stroke="#6b4423" stroke-width="3"><rect x="240" y="140" width="110" height="60"/><rect x="232" y="122" width="56" height="22"/><path d="M230 210 q60 30 130 0" fill="none"/></g>
+    <line x1="350" y1="150" x2="380" y2="110" stroke="#6b4423" stroke-width="5"/><g stroke="#6b4423" stroke-width="2"><line x1="260" y1="150" x2="260" y2="195"/><line x1="290" y1="150" x2="290" y2="195"/><line x1="320" y1="150" x2="320" y2="195"/></g>
+    <text x="300" y="240" text-anchor="middle" font-family="Segoe UI" font-size="18" font-weight="700" fill="#3b2a1a">Rocker (cradle)</text>
+    <g transform="rotate(-10 500 170)"><rect x="420" y="160" width="170" height="30" fill="#b07a40" stroke="#6b4423" stroke-width="3"/><path d="M425 170 H585" stroke="#4a90c8" stroke-width="10"/>
+    <g stroke="#6b4423" stroke-width="3"><line x1="450" y1="162" x2="450" y2="188"/><line x1="480" y1="162" x2="480" y2="188"/><line x1="510" y1="162" x2="510" y2="188"/><line x1="540" y1="162" x2="540" y2="188"/><line x1="570" y1="162" x2="570" y2="188"/></g></g>
+    <text x="505" y="240" text-anchor="middle" font-family="Segoe UI" font-size="18" font-weight="700" fill="#3b2a1a">Sluice</text>
+    <text x="16" y="30" font-family="Segoe UI, sans-serif" font-size="20" font-weight="700" fill="#3b2a1a">Mining tools: heavy gold sinks, light sand washes away</text></svg>`,
+  camp: `<svg viewBox="0 0 600 300" xmlns="http://www.w3.org/2000/svg">
+    <rect width="600" height="300" fill="#f7d9a8"/><path d="M0 150 L120 80 L230 140 L340 70 L460 140 L600 90 V300 H0Z" fill="#b98f5a"/><path d="M0 210 H600 V300 H0Z" fill="#d6b07a"/>
+    <g fill="#f3ead8" stroke="#8b5a2b" stroke-width="3"><polygon points="40,215 90,150 140,215"/><polygon points="160,220 205,160 250,220"/><polygon points="470,215 515,155 560,215"/></g>
+    <g stroke="#8b5a2b" stroke-width="3"><line x1="90" y1="150" x2="90" y2="215"/><line x1="205" y1="160" x2="205" y2="220"/><line x1="515" y1="155" x2="515" y2="215"/></g>
+    <rect x="285" y="140" width="140" height="80" fill="#a0693a" stroke="#6b4423" stroke-width="3"/><polygon points="275,142 355,100 435,142" fill="#7a4f22"/><rect x="340" y="175" width="28" height="45" fill="#5a3a1a"/>
+    <rect x="290" y="112" width="130" height="30" fill="#fff8e1" stroke="#6b4423" stroke-width="2"/><text x="355" y="133" text-anchor="middle" font-family="Georgia, serif" font-size="17" font-weight="700" fill="#3b2a1a">GENERAL STORE</text>
+    <rect x="440" y="225" width="140" height="56" rx="4" fill="#fff8e1" stroke="#6b4423" stroke-width="3"/><text x="510" y="248" text-anchor="middle" font-family="Georgia, serif" font-size="16" font-weight="700" fill="#c92a2a">EGGS $1 EACH</text><text x="510" y="270" text-anchor="middle" font-family="Georgia, serif" font-size="14" fill="#3b2a1a">Shovels $10</text>
+    <line x1="510" y1="281" x2="510" y2="298" stroke="#6b4423" stroke-width="4"/>
+    <text x="16" y="30" font-family="Segoe UI, sans-serif" font-size="20" font-weight="700" fill="#3b2a1a">A mining camp: tents, a store, and very high prices</text></svg>`,
+  river: `<svg viewBox="0 0 600 300" xmlns="http://www.w3.org/2000/svg">
+    <rect width="300" height="300" fill="#bfe3f5"/><rect x="300" width="300" height="300" fill="#e2d2b4"/>
+    <path d="M0 150 Q150 120 300 150 V300 H0Z" fill="#7db35b"/><path d="M300 150 Q450 130 600 150 V300 H300Z" fill="#a08a63"/>
+    <path d="M0 225 Q150 205 300 228 V280 Q150 262 0 282Z" fill="#3f8fd0"/><path d="M300 228 Q450 210 600 226 V278 Q450 262 300 280Z" fill="#8a6a3a"/>
+    <g fill="#e8805a"><path d="M60 250 q12 -9 24 0 q-12 9 -24 0z"/><path d="M150 242 q12 -9 24 0 q-12 9 -24 0z"/><path d="M220 255 q12 -9 24 0 q-12 9 -24 0z"/></g>
+    <rect x="128" y="105" width="14" height="60" fill="#6b4423"/><circle cx="135" cy="95" r="34" fill="#5c9a45"/>
+    <g fill="#6b4423"><rect x="380" y="150" width="16" height="14"/><rect x="460" y="146" width="16" height="12"/><rect x="530" y="152" width="16" height="12"/></g>
+    <g fill="#8a7a6a"><circle cx="420" cy="200" r="10"/><circle cx="500" cy="196" r="8"/><circle cx="560" cy="204" r="11"/></g>
+    <line x1="300" y1="0" x2="300" y2="300" stroke="#fff" stroke-width="6"/>
+    <text x="150" y="40" text-anchor="middle" font-family="Segoe UI" font-size="24" font-weight="800" fill="#2f6b3a">Before</text><text x="450" y="40" text-anchor="middle" font-family="Segoe UI" font-size="24" font-weight="800" fill="#7a4f22">After mining</text>
+    <text x="150" y="66" text-anchor="middle" font-family="Segoe UI" font-size="15" fill="#3b2a1a">clear water, salmon, oak trees</text><text x="450" y="66" text-anchor="middle" font-family="Segoe UI" font-size="15" fill="#3b2a1a">muddy water, cut trees, rock piles</text></svg>`,
+  world: `<svg viewBox="0 0 600 300" xmlns="http://www.w3.org/2000/svg">
+    <rect width="600" height="300" fill="#cde9f7"/><path d="M0 210 H600 V300 H0Z" fill="#3f8fd0"/><path d="M0 200 Q100 190 200 205 L200 300 H0Z" fill="#c9b38a"/>
+    <g fill="#a0693a" stroke="#6b4423" stroke-width="2"><rect x="20" y="150" width="50" height="50"/><rect x="80" y="160" width="40" height="40"/><rect x="128" y="145" width="50" height="55"/></g>
+    <text x="100" y="140" text-anchor="middle" font-family="Georgia, serif" font-size="16" font-weight="700" fill="#3b2a1a">San Francisco</text>
+    <g transform="translate(250 150)"><path d="M0 50 H90 L78 70 H12Z" fill="#6b4423"/><line x1="45" y1="50" x2="45" y2="0" stroke="#3b2a1a" stroke-width="3"/><polygon points="47,4 80,28 47,44" fill="#fff"/><rect x="45" y="-12" width="22" height="12" fill="#006847"/><rect x="51" y="-12" width="10" height="12" fill="#fff"/><rect x="61" y="-12" width="6" height="12" fill="#ce1126"/></g>
+    <g transform="translate(360 135)"><path d="M0 60 H100 L86 82 H14Z" fill="#6b4423"/><line x1="50" y1="60" x2="50" y2="0" stroke="#3b2a1a" stroke-width="3"/><polygon points="52,4 88,32 52,52" fill="#fff"/><rect x="50" y="-14" width="26" height="14" fill="#d52b1e"/><rect x="50" y="-14" width="26" height="7" fill="#fff"/><rect x="50" y="-14" width="9" height="7" fill="#0039a6"/></g>
+    <g transform="translate(480 150)"><path d="M0 50 H90 L78 70 H12Z" fill="#6b4423"/><line x1="45" y1="50" x2="45" y2="0" stroke="#3b2a1a" stroke-width="3"/><polygon points="47,4 80,28 47,44" fill="#fff"/><rect x="45" y="-12" width="24" height="12" fill="#f4c542"/><text x="57" y="-2" text-anchor="middle" font-size="10" fill="#c92a2a">金</text></g>
+    <text x="16" y="30" font-family="Segoe UI, sans-serif" font-size="20" font-weight="700" fill="#3b2a1a">Ships came from Mexico, Chile, China, and many other places</text>
+    <text x="16" y="56" font-family="Segoe UI, sans-serif" font-size="16" fill="#3b2a1a">金山 = "Gold Mountain" (Gam Saan) - what Chinese miners called California</text></svg>`,
+  state: `<svg viewBox="0 0 600 300" xmlns="http://www.w3.org/2000/svg">
+    <rect width="600" height="300" fill="#fff4d6"/>
+    <g transform="translate(60 70)"><rect width="230" height="150" fill="#fff" stroke="#3b2a1a" stroke-width="2"/><rect y="128" width="230" height="22" fill="#b22234"/>
+    <polygon points="22,10 27,25 42,25 30,34 35,49 22,40 9,49 14,34 2,25 17,25" fill="#b22234"/>
+    <path d="M60 100 q10 -30 40 -32 q20 -14 42 -4 q24 2 34 18 q10 2 12 12 l-8 2 q-4 10 -10 12 l0 12 h-8 l-2 -12 q-20 4 -40 0 l-2 12 h-8 l0 -14 q-14 -2 -18 6 l-6 0z" fill="#6b4423"/>
+    <path d="M30 128 q90 -10 180 0" stroke="#7db35b" stroke-width="6" fill="none"/>
+    <text x="115" y="122" text-anchor="middle" font-family="Georgia, serif" font-size="13" font-weight="700" fill="#3b2a1a">CALIFORNIA REPUBLIC</text></g>
+    <g font-family="Georgia, serif" fill="#3b2a1a"><text x="330" y="110" font-size="30" font-weight="700">September 9, 1850</text><text x="330" y="150" font-size="22">California becomes</text><text x="330" y="182" font-size="22">the 31st state!</text>
+    <text x="330" y="226" font-size="18" font-style="italic">Motto: "Eureka" - I have found it!</text></g>
+    <text x="16" y="34" font-family="Segoe UI, sans-serif" font-size="20" font-weight="700" fill="#3b2a1a">The Golden State</text></svg>`,
+  quiz: `<svg viewBox="0 0 600 300" xmlns="http://www.w3.org/2000/svg">
+    <rect width="600" height="300" fill="#fff0b8"/><g fill="#f4c542" stroke="#b8860b" stroke-width="3"><circle cx="160" cy="170" r="40"/><circle cx="250" cy="200" r="28"/><circle cx="320" cy="160" r="22"/></g>
+    <rect x="370" y="80" width="170" height="150" rx="10" fill="#fff" stroke="#8b5a2b" stroke-width="4"/><g stroke="#c9a26b" stroke-width="4"><line x1="390" y1="120" x2="520" y2="120"/><line x1="390" y1="150" x2="520" y2="150"/><line x1="390" y1="180" x2="500" y2="180"/></g>
+    <path d="M400 205 l12 12 l22 -26" stroke="#2f9e44" stroke-width="7" fill="none"/>
+    <text x="300" y="60" text-anchor="middle" font-family="Georgia, serif" font-size="34" font-weight="700" fill="#8b5a2b">The Gold Rush Quiz</text></svg>`,
+};
+
+// ====================================================================== lessons
+const LESSONS = [
+  { id: "people", title: "California's First People", sub: "Native Californians, long before the Gold Rush", pic: "village",
+    caption: "Many Native Californians gathered acorns from oak trees and stored them in granaries.",
+    text: [
+      "Long before the Gold Rush, California was already home to many people. Native Californians had lived here for thousands of years. There were more than 100 different tribes, like the Miwok, Maidu, Nisenan, Yokuts, Ohlone, and Pomo. Many tribes spoke their own languages.",
+      "Native Californians knew the land very well. Many gathered acorns from oak trees. They ground the acorns into flour and washed out the bitter taste to make soup and bread. They also fished for salmon, hunted deer, and gathered seeds, berries, and plants.",
+      "Many tribes were famous for their baskets. Some baskets were woven so tightly that they could hold water! People built homes from things that grew nearby, such as bark, tule reeds, and brush. Tribes traded shells, baskets, and other goods with their neighbors.",
+      "In 1769, Spain began building missions in California. Later, in 1821, California became part of Mexico, and big cattle ranches called ranchos spread across the land. These changes were very hard for Native Californians, but many families kept their languages and traditions alive.",
+    ],
+    words: [["tribe", "a group of people who share a language, land, and way of life"], ["acorn", "the nut of an oak tree"], ["tule", "a tall plant that grows in wet places"], ["mission", "a church settlement built by the Spanish"]],
+    checks: [
+      { q: "What important food did many Native Californians make from oak trees?", a: ["Corn", "Acorn flour", "Rice", "Potatoes"], c: 1 },
+      { q: "About how many tribes lived in California?", a: ["Only 2", "About 10", "More than 100", "None"], c: 2 },
+    ] },
+  { id: "found", title: "Gold Is Found!", sub: "Sutter's Mill, January 24, 1848", pic: "mill",
+    caption: "James Marshall saw shiny flakes of gold in the water by the new sawmill.",
+    text: [
+      "In 1839, a man named John Sutter came to California from Europe. He built a large fort in the Sacramento Valley. Today we call it Sutter's Fort.",
+      "Sutter wanted a sawmill to cut logs into boards. He hired a carpenter named James Marshall to build it on the American River, at a place called Coloma. Many workers helped build the mill, including Native Californians.",
+      "On January 24, 1848, Marshall looked into the water by the mill and saw something shiny. It was gold! Sutter wanted to keep it a secret, but the news spread anyway.",
+      "In May 1848, a store owner named Sam Brannan walked through San Francisco holding up a bottle of gold dust. He shouted, \"Gold! Gold from the American River!\" Soon almost everyone in town left to look for gold.",
+      "That same year, the war between the United States and Mexico ended, and California became part of the United States. In December 1848, President James K. Polk told the whole country about California's gold. The Gold Rush had begun!",
+    ],
+    words: [["sawmill", "a place where logs are cut into boards"], ["carpenter", "a person who builds things with wood"], ["Coloma", "the place on the American River where gold was found"]],
+    checks: [
+      { q: "Who found gold at Sutter's Mill?", a: ["Sam Brannan", "President Polk", "James Marshall", "Levi Strauss"], c: 2 },
+      { q: "In what year was gold found at Sutter's Mill?", a: ["1776", "1848", "1850", "1900"], c: 1 },
+    ] },
+  { id: "travel", title: "The Forty-Niners Travel West", sub: "By land and by sea", pic: "routes",
+    caption: "Forty-niners came by wagon, around the tip of South America, or through Panama.",
+    text: [
+      "The people who rushed to California in 1849 were called forty-niners. They came from all over the United States and from around the world: Mexico, Chile, Peru, China, Australia, France, and many other places.",
+      "By land: Many families crossed the country in covered wagons pulled by oxen. The trip from Missouri was about 2,000 miles and took 4 to 6 months. They crossed rivers, deserts, and high mountains. Some ran out of food and water, and many got sick.",
+      "Around Cape Horn: Others sailed all the way around the bottom tip of South America. This trip was about 18,000 miles and could take 5 to 8 months, with storms, seasickness, and boring food.",
+      "The Panama shortcut: Some sailed to Panama, crossed the jungle by canoe and mule, and then took another ship to San Francisco. It was faster, but many travelers caught dangerous diseases.",
+      "San Francisco grew very fast, from about 1,000 people in 1848 to more than 25,000 people just two years later. So many sailors ran off to find gold that hundreds of empty ships were left in the harbor!",
+    ],
+    words: [["forty-niners", "people who came to California in 1849 to look for gold"], ["oxen", "strong cattle used to pull wagons"], ["Cape Horn", "the southern tip of South America"]],
+    checks: [
+      { q: "Which route went all the way around the tip of South America?", a: ["The California Trail", "Cape Horn", "The Panama shortcut", "The railroad"], c: 1 },
+      { q: "What were the people who came to California in 1849 called?", a: ["Forty-niners", "Pilgrims", "Cowboys", "Astronauts"], c: 0 },
+    ] },
+  { id: "camps", title: "Life in the Mining Camps", sub: "Pans, rockers, and very high prices", pic: "tools", pic2: "camp",
+    caption: "Gold is very heavy, so it sinks to the bottom while sand and dirt wash away.",
+    caption2: "Everything had to be brought from far away, so prices were very high.",
+    text: [
+      "Miners used simple tools at first. With a gold pan, a miner scooped up water and gravel and swirled it around. The light sand washed out, and the heavy gold sank to the bottom.",
+      "A rocker, also called a cradle, was a wooden box that miners rocked back and forth like a baby's cradle. A long wooden trough called a sluice used running water to wash lots of dirt at once. These tools needed a team of miners.",
+      "Miners lived in tents and rough cabins in camps with names like Hangtown (now Placerville) and Rough and Ready. The work was hard. Miners stood in icy water all day, and many got sick.",
+      "Because everything had to be shipped from far away, prices were very high. One egg could cost $1. That was about what a worker back East earned in a whole day!",
+      "Most miners did not get rich. Often the people who made the most money were the ones who sold things to miners, like food, tools, and clothes. Levi Strauss sold supplies and later made strong work pants, the first blue jeans. A few women, like Luzena Wilson, earned money by cooking meals and running hotels.",
+    ],
+    words: [["gold pan", "a shallow metal pan used to wash gravel and find gold"], ["rocker", "a wooden box rocked back and forth to wash out gold"], ["sluice", "a long wooden trough that uses running water to find gold"], ["merchant", "a person who sells things"]],
+    checks: [
+      { q: "Which mining tool was a wooden box that miners rocked back and forth?", a: ["A gold pan", "A rocker (cradle)", "A shovel", "A wagon"], c: 1 },
+      { q: "Who often made the most money during the Gold Rush?", a: ["People who sold things to miners", "Every miner", "Sailors", "Nobody made money"], c: 0 },
+    ] },
+  { id: "native", title: "The Gold Rush and Native Californians", sub: "A hard part of the story", pic: "river",
+    caption: "Mining made rivers muddy and destroyed the plants and fish that Native families needed.",
+    text: [
+      "The Gold Rush brought big changes for Native Californians, and many of those changes were very harmful.",
+      "Miners dug up riverbanks and filled the streams with mud. Salmon could not live in the dirty water. Miners cut down oak trees, and their cattle and pigs ate the plants that Native people gathered. Many Native families lost their food.",
+      "Miners also took over land where Native people had lived for thousands of years. The newcomers brought diseases like measles and smallpox. Many Native Californians were attacked and killed. A California law passed in 1850 even let settlers force Native people to work for them.",
+      "Before the Gold Rush, there were about 150,000 Native Californians. By 1870, only about 30,000 were left.",
+      "But Native Californians did not give up. They worked to keep their families together and spoke up for their rights. Today California is home to more than 100 tribes, and Native Californians still share their languages, basket weaving, dances, and stories.",
+    ],
+    words: [["disease", "a sickness"], ["rights", "the fair things every person should be allowed to have and do"], ["tradition", "a way of doing things that is passed down from older people to younger people"]],
+    checks: [
+      { q: "How did mining hurt the rivers?", a: ["It made them cleaner", "It made the water muddy, so salmon could not live there", "It added more fish", "It did not change them"], c: 1 },
+      { q: "Do Native Californian tribes still live in California today?", a: ["No, none are left", "Yes, more than 100 tribes", "Only in other states", "Only in museums"], c: 1 },
+    ] },
+  { id: "world", title: "People from Around the World", sub: "Many people, many stories", pic: "world",
+    caption: "The Gold Rush brought people to California from all over the world.",
+    text: [
+      "Californios were Mexican Californians who already lived here before the Gold Rush. Some of them mined for gold, but many later lost their land in courts.",
+      "Miners from Mexico, Chile, and Peru often had a lot of mining experience, and they taught others how to find gold. But in 1850, California passed the Foreign Miners' Tax. Miners from other countries had to pay $20 every month. This unfair tax made many of them leave the mines.",
+      "Thousands of people came from China. They called California \"Gam Saan\" (金山), which means Gold Mountain. Chinese miners often worked old claims that others had left behind. They faced unfair taxes and were treated badly, but they kept working hard. Later, many helped build the railroad across the mountains.",
+      "African Americans came too. Some free Black miners used the gold they found to buy freedom for family members who were still enslaved. California joined the United States as a free state, which meant slavery was not allowed.",
+    ],
+    words: [["Californio", "a Mexican Californian who lived here before the Gold Rush"], ["tax", "money people must pay to the government"], ["claim", "a piece of land where a miner had the right to dig"], ["immigrant", "a person who moves to a new country"]],
+    checks: [
+      { q: "What did Chinese miners call California?", a: ["Gold Mountain", "Big Sky", "New Spain", "Silver Lake"], c: 0 },
+      { q: "What was the Foreign Miners' Tax?", a: ["Free money for miners", "An unfair tax on miners from other countries", "A prize for finding gold", "A tax on eggs"], c: 1 },
+    ] },
+  { id: "state", title: "California Becomes a State", sub: "The Golden State, 1850", pic: "state",
+    caption: "California joined the United States on September 9, 1850.",
+    text: [
+      "California grew so fast that it needed laws and a government. In 1849, leaders met in Monterey and wrote a constitution, a plan for how California would be run. They decided that California would be a free state.",
+      "On September 9, 1850, California became the 31st state of the United States. In 1854, Sacramento became the state capital.",
+      "By the mid-1850s, most of the easy gold was gone. Big companies used machines and powerful water hoses to wash away whole hillsides. This hurt the land and rivers so much that it was later stopped.",
+      "Many people stayed in California anyway. They became farmers, ranchers, and builders, and cities like San Francisco and Sacramento kept growing. In 1869, the Transcontinental Railroad connected California to the rest of the country.",
+      "Today California's nickname is \"The Golden State,\" and its state motto is \"Eureka,\" which means \"I have found it!\"",
+    ],
+    words: [["constitution", "a written plan for a government"], ["capital", "the city where a state's government meets"], ["Eureka", "a Greek word that means \"I have found it!\""]],
+    checks: [
+      { q: "When did California become a state?", a: ["1776", "1848", "September 9, 1850", "1906"], c: 2 },
+      { q: "What is California's nickname?", a: ["The Sunshine State", "The Golden State", "The Lone Star State", "The Big Apple"], c: 1 },
+    ] },
+];
+
+// ====================================================================== the quiz
+const QUIZ = [
+  { q: "Who lived in California for thousands of years before the Gold Rush?", a: ["Native Californians", "Only miners", "Nobody", "Only sailors"], c: 0 },
+  { q: "Many Native Californians ground acorns into...", a: ["gold dust", "flour for soup and bread", "paint", "glue"], c: 1 },
+  { q: "Gold was found in 1848 at Sutter's Mill on which river?", a: ["The Mississippi River", "The American River", "The Colorado River", "The Hudson River"], c: 1 },
+  { q: "Who ran through San Francisco shouting \"Gold! Gold from the American River!\"?", a: ["Sam Brannan", "John Sutter", "James Marshall", "Levi Strauss"], c: 0 },
+  { q: "Why were the people who came in 1849 called forty-niners?", a: ["They were 49 years old", "They came in the year 1849", "There were only 49 of them", "They found 49 nuggets"], c: 1 },
+  { q: "Which way to California was faster, but people often caught dangerous diseases?", a: ["By wagon on the trail", "Around Cape Horn", "The Panama shortcut", "By train"], c: 2 },
+  { q: "How does a gold pan work?", a: ["Gold floats to the top", "Heavy gold sinks while light sand washes away", "It melts the rocks", "It uses magnets"], c: 1 },
+  { q: "Why did things like eggs cost so much in the mining camps?", a: ["Eggs were made of gold", "Everything had to be shipped from far away", "Chickens were not allowed", "Stores were closed"], c: 1 },
+  { q: "Levi Strauss became famous for making...", a: ["blue jeans", "gold pans", "wagons", "railroads"], c: 0 },
+  { q: "How did mining hurt Native Californians' food?", a: ["It made rivers muddy and destroyed plants and fish", "It gave them more salmon", "It planted more oak trees", "It did not change anything"], c: 0 },
+  { q: "About how many Native Californians were there before the Gold Rush?", a: ["About 150", "About 150,000", "About 15 million", "None"], c: 1 },
+  { q: "What did Chinese miners call California?", a: ["Gold Mountain", "Big River", "New Home", "Silver City"], c: 0 },
+  { q: "Why was the Foreign Miners' Tax unfair?", a: ["It made only miners from other countries pay $20 a month", "Everyone got free money", "It only taxed eggs", "It was not real"], c: 0 },
+  { q: "California became the 31st state in what year?", a: ["1776", "1848", "1850", "1869"], c: 2 },
+  { q: "California's motto \"Eureka\" means...", a: ["\"Let's go west!\"", "\"I have found it!\"", "\"Gold is heavy\"", "\"Welcome home\""], c: 1 },
+];
+const PASS = 12;
+
+// ====================================================================== saving
+const KEY = "goldrush-learning";
+let save = { done: {}, notes: {}, best: null, name: "" };
+try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && s.done) save = Object.assign(save, s); } catch (e) {}
+function store() { try { localStorage.setItem(KEY, JSON.stringify(save)); } catch (e) {} }
+const doneCount = () => LESSONS.filter(l => save.done[l.id]).length;
+const allDone = () => doneCount() === LESSONS.length;
+
+// ====================================================================== screens
+const main = document.getElementById("main");
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+function stopTalking() { try { speechSynthesis.cancel(); } catch (e) {} }
+document.getElementById("homeBtn").onclick = () => home();
+
+function home() {
+  stopTalking(); scrollTo(0, 0);
+  const n = doneCount();
+  let html = `<div class="progress"><b>Lessons turned in: ${n} of ${LESSONS.length}</b>
+    ${allDone() ? ` - the quiz is open! ${save.best != null ? `Your best score: <b>${save.best} of ${QUIZ.length}</b>` : ""}` : ` - turn in every lesson to open the quiz.`}
+    <div class="bar"><div style="width:${n / LESSONS.length * 100}%"></div></div></div><div class="cards">`;
+  LESSONS.forEach((l, i) => {
+    html += `<div class="card" data-lesson="${i}"><div class="pic">${PICS[l.pic]}</div><div class="body">
+      <div class="num">Lesson ${i + 1}</div><h3>${esc(l.title)}</h3>
+      ${save.done[l.id] ? `<span class="tag done">✓ Turned in</span>` : `<span class="tag new">Not turned in yet</span>`}</div></div>`;
+  });
+  html += `<div class="card quiz ${allDone() ? "" : "locked"}" id="quizCard"><div class="pic">${PICS.quiz}</div><div class="body">
+    <div class="num">Final</div><h3>The Gold Rush Quiz</h3>
+    ${allDone() ? `<span class="tag done">Open - ${QUIZ.length} questions</span>` : `<span class="tag locked">🔒 Locked - turn in all ${LESSONS.length} lessons first</span>`}</div></div></div>
+    <p class="muted" style="margin-top:22px">Teacher or parent: <a href="#" id="reset">start over</a> (clears turned-in lessons and quiz scores).</p>`;
+  main.innerHTML = html;
+  main.querySelectorAll("[data-lesson]").forEach(c => c.onclick = () => lesson(+c.dataset.lesson));
+  document.getElementById("quizCard").onclick = () => {
+    if (allDone()) quizStart();
+    else { const next = LESSONS.findIndex(l => !save.done[l.id]); alert(`The quiz is locked.\n\nTurn in all ${LESSONS.length} lessons first. Next up: Lesson ${next + 1}, "${LESSONS[next].title}".`); }
+  };
+  document.getElementById("reset").onclick = e => {
+    e.preventDefault();
+    if (confirm("Start over? This clears all turned-in lessons, notes, and quiz scores.")) { save = { done: {}, notes: {}, best: null, name: save.name }; store(); home(); }
+  };
+}
+
+function lesson(i) {
+  stopTalking(); scrollTo(0, 0);
+  const l = LESSONS[i], turned = !!save.done[l.id];
+  let html = `<div class="lesson"><div class="num" style="color:var(--brown);font-weight:700">LESSON ${i + 1} OF ${LESSONS.length}</div>
+    <h2>${esc(l.title)}</h2><div class="sub">${esc(l.sub)}</div>
+    <div class="row noprint" style="margin-top:0"><button class="btn gold" id="read">🔊 Read to me</button></div>
+    <div class="figure">${PICS[l.pic]}</div><div class="caption">${esc(l.caption)}</div>`;
+  l.text.forEach((p, k) => {
+    html += `<p>${esc(p)}</p>`;
+    if (l.pic2 && k === 2) html += `<div class="figure">${PICS[l.pic2]}</div><div class="caption">${esc(l.caption2)}</div>`;
+  });
+  html += `<div class="words"><h4>📖 Words to know</h4>${l.words.map(([w, d]) => `<div><dt>${esc(w)}</dt> - <dd>${esc(d)}</dd></div>`).join("")}</div>
+    <div class="check"><h3>✏️ Check what you learned</h3>`;
+  l.checks.forEach((q, k) => {
+    html += `<div class="q" data-q="${k}"><div class="qt">${k + 1}. ${esc(q.q)}</div>${q.a.map((a, j) =>
+      `<label class="opt"><input type="radio" name="c${k}" value="${j}" ${turned && j === q.c ? "checked" : ""} ${turned ? "disabled" : ""}>${esc(a)}</label>`).join("")}</div>`;
+  });
+  html += `<div class="q"><div class="qt">${l.checks.length + 1}. Write one thing you learned in this lesson:</div>
+      <textarea id="note" ${turned ? "disabled" : ""} placeholder="I learned that...">${esc(save.notes[l.id] || "")}</textarea></div>
+    <div class="msg" id="msg"></div>
+    ${turned ? `<div class="stamp">TURNED IN ✓</div>` : ""}
+    <div class="row">${turned ? "" : `<button class="btn green" id="turnIn">📥 Turn in lesson</button>`}
+      ${i + 1 < LESSONS.length ? `<button class="btn" id="next">Next lesson →</button>` : ""}
+      <button class="btn" id="back">Back to lessons</button></div></div></div>`;
+  main.innerHTML = html;
+  document.getElementById("back").onclick = home;
+  const nx = document.getElementById("next"); if (nx) nx.onclick = () => lesson(i + 1);
+  document.getElementById("read").onclick = () => {
+    try {
+      if (speechSynthesis.speaking) { stopTalking(); return; }
+      const u = new SpeechSynthesisUtterance([l.title + ".", ...l.text].join(" ").replace(/金山/g, ""));
+      u.rate = 0.9; speechSynthesis.speak(u);
+    } catch (e) { alert("Read to me doesn't work on this computer."); }
+  };
+  const ti = document.getElementById("turnIn");
+  if (ti) ti.onclick = () => {
+    const msg = document.getElementById("msg");
+    let allRight = true, missing = false;
+    l.checks.forEach((q, k) => {
+      const box = main.querySelector(`[data-q="${k}"]`), pick = box.querySelector("input:checked");
+      box.querySelectorAll(".opt").forEach(o => o.classList.remove("right", "wrong"));
+      if (!pick) { missing = true; allRight = false; return; }
+      const right = +pick.value === q.c;
+      pick.parentElement.classList.add(right ? "right" : "wrong");
+      if (!right) allRight = false;
+    });
+    const note = document.getElementById("note").value.trim();
+    save.notes[l.id] = note; store();
+    if (missing) { msg.className = "msg bad"; msg.textContent = "Answer every question before you turn it in."; return; }
+    if (!allRight) { msg.className = "msg bad"; msg.textContent = "Not quite! Look back at the lesson and fix the answers in red."; return; }
+    if (note.split(/\s+/).filter(Boolean).length < 4) { msg.className = "msg bad"; msg.textContent = "Write a full sentence about something you learned (at least 4 words)."; return; }
+    save.done[l.id] = true; store();
+    msg.className = "msg good";
+    msg.textContent = allDone() ? "Great job! All lessons are turned in. The quiz is open!" : "Great job! Lesson turned in.";
+    ti.remove();
+    document.getElementById("note").disabled = true;
+    main.querySelectorAll("input[type=radio]").forEach(r => r.disabled = true);
+    msg.insertAdjacentHTML("afterend", `<div class="stamp">TURNED IN ✓</div>`);
+    if (allDone()) document.querySelector(".lesson .row:last-child").insertAdjacentHTML("afterbegin", `<button class="btn gold" id="goQuiz">Take the quiz →</button>`),
+      document.getElementById("goQuiz").onclick = quizStart;
+  };
+}
+
+// ---------------------------------------------------------------- quiz
+let qi = 0, answers = [];
+function quizStart() { stopTalking(); qi = 0; answers = []; quizQuestion(); }
+function quizQuestion() {
+  scrollTo(0, 0);
+  const q = QUIZ[qi];
+  main.innerHTML = `<div class="quizbox"><div class="count">Question ${qi + 1} of ${QUIZ.length}</div>
+    <div class="bar"><div style="width:${qi / QUIZ.length * 100}%"></div></div>
+    <div class="qt">${esc(q.q)}</div>${q.a.map((a, j) => `<label class="opt"><input type="radio" name="qq" value="${j}">${esc(a)}</label>`).join("")}
+    <div class="msg bad" id="msg"></div>
+    <div class="row"><button class="btn green" id="nextQ">${qi + 1 < QUIZ.length ? "Next →" : "Finish"}</button><button class="btn" id="quit">Stop the quiz</button></div></div>`;
+  document.getElementById("quit").onclick = () => { if (confirm("Stop the quiz? Your answers won't count.")) home(); };
+  document.getElementById("nextQ").onclick = () => {
+    const pick = main.querySelector("input:checked");
+    if (!pick) { document.getElementById("msg").textContent = "Pick an answer first."; return; }
+    answers[qi] = +pick.value;
+    if (++qi < QUIZ.length) quizQuestion(); else quizResult();
+  };
+}
+function quizResult() {
+  scrollTo(0, 0);
+  const score = answers.filter((a, i) => a === QUIZ[i].c).length;
+  if (save.best == null || score > save.best) save.best = score;
+  store();
+  const stars = score === QUIZ.length ? 3 : score >= PASS ? 2 : score >= 8 ? 1 : 0;
+  let html = `<div class="quizbox" style="text-align:center"><div class="stars">${"⭐".repeat(stars)}${"☆".repeat(3 - stars)}</div>
+    <div class="big">${score} of ${QUIZ.length}</div>
+    <p>${score === QUIZ.length ? "PERFECT! You're a true Gold Rush expert!" : score >= PASS ? "You passed! Great work, forty-niner!" : `You need ${PASS} to pass. Look back at the lessons and try again - you can do it!`}</p>
+    <div class="row" style="justify-content:center">${score >= PASS ? `<button class="btn gold" id="cert">🏅 Get my certificate</button>` : ""}<button class="btn green" id="again">Try again</button><button class="btn" id="home2">Back to lessons</button></div></div>
+    <h3>Check your answers</h3><div class="review">`;
+  QUIZ.forEach((q, i) => {
+    const ok = answers[i] === q.c;
+    html += `<div>${ok ? "✅" : "❌"} <b>${i + 1}. ${esc(q.q)}</b><br>${ok ? `Your answer: ${esc(q.a[q.c])}` : `You said: ${esc(q.a[answers[i]])} · Right answer: <b>${esc(q.a[q.c])}</b>`}</div>`;
+  });
+  main.innerHTML = html + "</div>";
+  document.getElementById("again").onclick = quizStart;
+  document.getElementById("home2").onclick = home;
+  const c = document.getElementById("cert"); if (c) c.onclick = () => certificate(score);
+}
+function certificate(score) {
+  scrollTo(0, 0);
+  const today = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+  main.innerHTML = `<div class="row noprint"><label>Your name: <input type="text" id="name" value="${esc(save.name)}" placeholder="Type your name"></label>
+      <button class="btn gold" id="print">🖨️ Print</button><button class="btn" id="home3">Back to lessons</button></div>
+    <div class="cert"><div style="font-size:50px">🏅</div><div style="letter-spacing:4px;font-weight:700;color:#8b5a2b">CERTIFICATE OF ACHIEVEMENT</div>
+      <h2>Gold Rush Expert</h2><div>This certifies that</div><div class="who" id="who">${esc(save.name) || "&nbsp;"}</div>
+      <div>finished all ${LESSONS.length} Gold Rush lessons and scored <b>${score} out of ${QUIZ.length}</b> on the Gold Rush Quiz.</div>
+      <div style="margin-top:18px" class="muted">${today}</div><div style="margin-top:8px;font-family:Georgia,serif;font-style:italic">"Eureka!"</div></div>`;
+  const name = document.getElementById("name");
+  name.oninput = () => { save.name = name.value; store(); document.getElementById("who").textContent = name.value || " "; };
+  document.getElementById("print").onclick = () => print();
+  document.getElementById("home3").onclick = home;
+}
+
+home();
+
+// ---------------------------------------------------------------- Open / Cancel / Uninstall (copies without a start-up box)
+if (LAUNCH_MENU) {
+  const L = document.getElementById("launch");
+  let first = true;
+  try { first = !sessionStorage.getItem("learning-launched"); sessionStorage.setItem("learning-launched", "1"); } catch (e) {}
+  if (first) {
+    L.style.display = "flex";
+    L.querySelectorAll("button").forEach(b => b.onclick = () => {
+      const act = b.dataset.act;
+      if (act === "open") L.style.display = "none";
+      else if (act === "cancel") { window.close(); document.getElementById("launchMsg").textContent = "You can close this window now."; }
+      else document.getElementById("launchMsg").innerHTML = "To uninstall: right-click <b>Gold Rush Learning</b> in the Launcher &gt; <b>Uninstall</b>, then delete its folder from My files.";
+    });
+  }
+}
+</script>
+<a href="/games/" aria-label="All games" style="position:fixed;right:max(10px,env(safe-area-inset-right,0px));bottom:max(10px,env(safe-area-inset-bottom,0px));z-index:2147483000;background:rgba(0,0,0,.6);color:#fff;font:600 13px system-ui,sans-serif;padding:7px 11px;border-radius:10px;text-decoration:none">&#8962; All games</a>
+</body>
+</html>

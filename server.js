@@ -20,7 +20,7 @@ const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; ch
 
 const safeName = n => String(n || "").replace(/[^\p{L}\p{N} _.-]/gu, "").trim().slice(0, 80);
 // rooms are simple names used in the link: /daniel, /babushka-lessons
-const RESERVED = new Set(["english", "api", "ws", "index", "public", "arcade"]);
+const RESERVED = new Set(["english", "api", "ws", "index", "public", "arcade", "games"]);
 const cleanCode = c => String(c || "").toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 32);
 const validRoom = c => c.length >= 2 && !RESERVED.has(c);
 const newCode = () => { let c; do { c = "class-" + crypto.randomBytes(3).toString("hex"); } while (rooms.has(c)); return c; };
@@ -153,6 +153,8 @@ const server = http.createServer((req, res) => {
   if (p === "/") p = "/index.html";
   if (p === "/english" || p === "/english/") p = "/english/index.html";
   else if (p === "/arcade" || p === "/arcade/") p = "/arcade/index.html";
+  else if (p === "/games") { res.writeHead(301, { Location: "/games/" }); return res.end(); }   // the Games app (installable, works offline)
+  else if (p === "/games/") p = "/games/index.html";
   else if (/^\/[a-z0-9-]{2,32}\/?$/i.test(p) && validRoom(cleanCode(p))) p = "/index.html";   // /daniel -> the app, joining room "daniel"
   const file = path.normalize(path.join(PUBLIC, decodeURIComponent(p)));
   if (!file.startsWith(PUBLIC) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) { res.writeHead(404); return res.end("not found"); }
@@ -337,5 +339,6 @@ server.listen(PORT, "0.0.0.0", () => {
   for (const a of lanAddresses()) console.log("  Student (same Wi-Fi):     http://" + a + ":" + PORT + "/<teacher-name>");
   console.log("  English Coach:            http://localhost:" + PORT + "/english");
   console.log("  Click Arcade:             http://localhost:" + PORT + "/arcade");
+  console.log("  Games app:                http://localhost:" + PORT + "/games/");
   console.log("\n  Keep this window open while you use the app. Close it to stop.\n");
 });

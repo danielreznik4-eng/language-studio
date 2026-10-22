@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Cursor Maker</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { --bg: #1e1e26; --panel: #2a2a35; --btn: #3c3c46; --text: #fff; --dim: #aab; --gold: #ffd43b; --green: #2f9e44; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); font-family: "Segoe UI", system-ui, sans-serif; }
+  #app { display: flex; gap: 18px; padding: 14px 16px; flex-wrap: wrap; justify-content: center; }
+  h1 { font-size: 20px; margin: 0 0 10px; }
+  #grid { background: #888; image-rendering: pixelated; cursor: crosshair; touch-action: none; display: block; max-width: calc(100vw - 32px); height: auto; }
+  .side { width: 250px; }
+  .label { color: var(--dim); font-size: 13px; margin: 10px 0 5px; }
+  .tools label { display: block; font-size: 14px; margin: 3px 0; cursor: pointer; }
+  .pal { display: grid; grid-template-columns: repeat(6, 34px); gap: 6px; }
+  .pal button { width: 34px; height: 28px; border: 2px solid #555; border-radius: 4px; cursor: pointer; }
+  button.b { background: var(--btn); color: #fff; border: 1px solid #555; border-radius: 4px; padding: 6px 8px; font-size: 13px; cursor: pointer; }
+  button.b:hover { background: #4a4a56; }
+  .row { display: flex; gap: 8px; margin-top: 6px; }
+  .row > * { flex: 1; }
+  #done { width: 100%; background: var(--green); font-weight: bold; font-size: 15px; padding: 10px; margin-top: 12px; border: 0; }
+  #status { color: var(--gold); font-weight: bold; min-height: 22px; margin-top: 8px; font-size: 14px; }
+  #now { width: 40px; height: 24px; border: 1px solid #555; display: inline-block; vertical-align: middle; }
+  select { width: 100%; padding: 4px; }
+  #prev { background: var(--panel); border-radius: 4px; }
+  #info { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.75); align-items: center; justify-content: center; }
+  #info .box { background: var(--panel); max-width: 430px; padding: 18px 20px; border-radius: 8px; border: 2px solid var(--gold); line-height: 1.45; font-size: 14px; }
+  #info h2 { margin: 0 0 8px; color: var(--gold); font-size: 18px; }
+  #launch { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.85); align-items: center; justify-content: center; z-index: 5; }
+  #launch .box { background: var(--panel); padding: 20px; border-radius: 8px; width: 330px; text-align: center; }
+  #launch .row button { padding: 9px; font-size: 15px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div>
+    <h1>Draw your mouse pointer</h1>
+    <canvas id="grid" width="449" height="449"></canvas>
+    <div id="status"></div>
+  </div>
+  <div class="side">
+    <div class="label">Tools</div>
+    <div class="tools">
+      <label><input type="radio" name="tool" value="pencil" checked> Pencil</label>
+      <label><input type="radio" name="tool" value="eraser"> Eraser (or right-click)</label>
+      <label><input type="radio" name="tool" value="fill"> Fill</label>
+      <label><input type="radio" name="tool" value="hotspot"> Click point (where it clicks)</label>
+    </div>
+    <div class="label">Colors</div>
+    <div class="pal" id="pal"></div>
+    <div class="row"><button class="b" id="flip">Flip colors</button><label class="b" style="text-align:center">More colors <input type="color" id="more" style="width:22px;height:16px;border:0;padding:0;vertical-align:middle"></label></div>
+    <div class="label">Now drawing with: <canvas id="now" width="40" height="24"></canvas></div>
+    <div class="label">Start from</div>
+    <select id="tmpl"><option value="">(pick one)</option><option value="arrow">Arrow</option><option value="crosshair">Minecraft crosshair</option><option value="dot">Red dot</option><option value="blank">Blank</option></select>
+    <div class="row"><button class="b" id="undo">Undo</button><button class="b" id="clear">Clear</button></div>
+    <div class="label">Real size</div>
+    <canvas id="prev" width="160" height="40"></canvas>
+    <button class="b" id="done">DONE - make it my cursor</button>
+    <div class="row"><button class="b" id="normal">Back to the normal cursor</button></div>
+  </div>
+</div>
+
+<div id="info"><div class="box">
+  <h2>Your cursor is ready!</h2>
+  <div id="infoText"></div>
+  <div class="row" style="margin-top:12px"><button class="b" id="infoOk">OK</button></div>
+</div></div>
+
+<div id="launch"><div class="box">
+  <h2 style="margin:0 0 4px">Cursor Maker</h2>
+  <div style="color:var(--dim);margin-bottom:14px">Draw your own mouse pointer.</div>
+  <div class="row"><button class="b" data-act="open">Open</button><button class="b" data-act="cancel">Cancel</button><button class="b" data-act="uninstall">Uninstall</button></div>
+  <div id="launchMsg" style="margin-top:12px;font-size:13px;color:var(--gold)"></div>
+</div></div>
+
+<script>
+"use strict";
+// Set to true in the Chromebook copy: shows the Open / Cancel / Uninstall box when the app starts.
+const LAUNCH_MENU = false;
+const N = 32, CELL = 14, FLIP = "flip";
+const isMac = /Mac/.test(navigator.platform) || /Mac OS/.test(navigator.userAgent);
+const isChromeOS = /CrOS/.test(navigator.userAgent);
+const grid = document.getElementById("grid"), g = grid.getContext("2d");
+const prev = document.getElementById("prev"), pg = prev.getContext("2d");
+const nowC = document.getElementById("now"), ng = nowC.getContext("2d");
+const setStatus = t => document.getElementById("status").textContent = t;
+let art = { px: [], hx: 0, hy: 0 }, color = "#000000", undoStack = [];
+
+function blank() { return { px: Array.from({ length: N }, () => Array(N).fill(null)), hx: 0, hy: 0 }; }
+function copy(a) { return { px: a.px.map(r => r.slice()), hx: a.hx, hy: a.hy }; }
+function template(name) {
+  const d = blank();
+  if (name === "arrow") {
+    const rows = ["B", "BB", "BWB", "BWWB", "BWWWB", "BWWWWB", "BWWWWWB", "BWWWWWWB", "BWWWWWWWB", "BWWWWWWWWB", "BWWWWWWWWWB",
+                  "BWWWWWWBBBBB", "BWWWBWWB", "BWWB BWWB", "BWB  BWWB", "BB    BWWB", "B     BWWB", "       BWWB", "       BBB"];
+    rows.forEach((r, y) => [...r].forEach((ch, x) => { if (ch === "B") d.px[y][x] = "#000000"; if (ch === "W") d.px[y][x] = "#ffffff"; }));
+  } else if (name === "crosshair") {
+    for (let i = 7; i < 25; i++) for (let t = 15; t < 17; t++) { d.px[t][i] = FLIP; d.px[i][t] = FLIP; }
+    d.hx = 16; d.hy = 16;
+  } else if (name === "dot") {
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      const r = Math.hypot(x - 15.5, y - 15.5);
+      if (r < 5) d.px[y][x] = "#e03131"; else if (r < 6.5) d.px[y][x] = "#ffffff";
+    }
+    d.hx = 16; d.hy = 16;
+  }
+  return d;
+}
+const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+                set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
+                del(k) { try { localStorage.removeItem(k); } catch (e) {} } };
+try { art = JSON.parse(store.get("cursor-maker-drawing")) || template("arrow"); } catch (e) { art = template("arrow"); }
+if (!art.px || art.px.length !== N) art = template("arrow");
+
+function swatch(ctx, x, y, w, h, c) {
+  if (c === FLIP) { ctx.fillStyle = "#000"; ctx.fillRect(x, y, w, h); ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.moveTo(x + w, y); ctx.lineTo(x + w, y + h); ctx.lineTo(x, y + h); ctx.fill(); }
+  else { ctx.fillStyle = c; ctx.fillRect(x, y, w, h); }
+}
+function draw() {
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const c = art.px[y][x];
+    if (c) swatch(g, x * CELL, y * CELL, CELL, CELL, c);
+    else { g.fillStyle = (x + y) % 2 ? "#d6d8e2" : "#c4c6d2"; g.fillRect(x * CELL, y * CELL, CELL, CELL); }
+  }
+  g.strokeStyle = "rgba(0,0,0,.16)"; g.lineWidth = 1; g.beginPath();
+  for (let i = 0; i <= N; i++) { g.moveTo(i * CELL + .5, 0); g.lineTo(i * CELL + .5, N * CELL); g.moveTo(0, i * CELL + .5); g.lineTo(N * CELL, i * CELL + .5); }
+  g.stroke();
+  g.strokeStyle = "#ff0050"; g.lineWidth = 2; g.beginPath(); g.arc(art.hx * CELL + CELL / 2, art.hy * CELL + CELL / 2, CELL / 2 - 2, 0, 7); g.stroke();
+  // real-size preview on light and dark
+  pg.fillStyle = "#fff"; pg.fillRect(0, 0, 80, 40); pg.fillStyle = "#282828"; pg.fillRect(80, 0, 80, 40);
+  for (let half = 0; half < 2; half++) for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const c = art.px[y][x]; if (!c) continue;
+    pg.fillStyle = c === FLIP ? (half ? "#fff" : "#000") : c; pg.fillRect(half * 80 + 24 + x, 4 + y, 1, 1);
+  }
+  ng.clearRect(0, 0, 40, 24); swatch(ng, 0, 0, 40, 24, color);
+}
+
+// palette
+["#000000", "#ffffff", "#868e96", "#e03131", "#ff922b", "#ffd43b", "#40c057", "#20c997", "#1c7ed6", "#7048e8", "#e64980", "#8b5a2b"].forEach(c => {
+  const b = document.createElement("button"); b.style.background = c; b.onclick = () => pick(c);
+  document.getElementById("pal").appendChild(b);
+});
+const toolNow = () => document.querySelector("input[name=tool]:checked").value;
+const setTool = t => document.querySelector(`input[value=${t}]`).checked = true;
+function pick(c) { color = c; if (["eraser", "hotspot"].includes(toolNow())) setTool("pencil"); draw(); }
+document.getElementById("flip").onclick = () => pick(FLIP);
+document.getElementById("more").oninput = e => pick(e.target.value);
+
+function pushUndo() { undoStack.push(copy(art)); if (undoStack.length > 60) undoStack.shift(); }
+document.getElementById("undo").onclick = () => { if (undoStack.length) { art = undoStack.pop(); draw(); } };
+addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") { e.preventDefault(); if (undoStack.length) { art = undoStack.pop(); draw(); } } });
+document.getElementById("clear").onclick = () => { pushUndo(); art = blank(); draw(); };
+document.getElementById("tmpl").onchange = e => { if (e.target.value) { pushUndo(); art = template(e.target.value); e.target.value = ""; draw(); } };
+
+function cellAt(e) {
+  const r = grid.getBoundingClientRect();
+  return [Math.floor((e.clientX - r.left) * (grid.width / r.width) / CELL), Math.floor((e.clientY - r.top) * (grid.height / r.height) / CELL)];
+}
+function fill(x, y, from, to) {
+  if (from === to) return;
+  const st = [[x, y]];
+  while (st.length) {
+    const [a, b] = st.pop();
+    if (a < 0 || b < 0 || a >= N || b >= N || art.px[b][a] !== from) continue;
+    art.px[b][a] = to; st.push([a + 1, b], [a - 1, b], [a, b + 1], [a, b - 1]);
+  }
+}
+let painting = false;
+function paint(e) {
+  const [x, y] = cellAt(e); if (x < 0 || y < 0 || x >= N || y >= N) return;
+  const t = e.buttons === 2 || e.button === 2 ? "eraser" : toolNow();
+  if (t === "pencil") art.px[y][x] = color;
+  else if (t === "eraser") art.px[y][x] = null;
+  else if (t === "hotspot") { art.hx = x; art.hy = y; }
+  else if (t === "fill") fill(x, y, art.px[y][x], color);
+  draw();
+}
+grid.addEventListener("contextmenu", e => e.preventDefault());
+grid.addEventListener("pointerdown", e => { pushUndo(); painting = true; grid.setPointerCapture(e.pointerId); paint(e); });
+grid.addEventListener("pointermove", e => { if (painting && (["pencil", "eraser"].includes(toolNow()) || e.buttons === 2)) paint(e); });
+grid.addEventListener("pointerup", () => { painting = false; store.set("cursor-maker-drawing", JSON.stringify(art)); });
+
+// the cursor picture (32x32 PNG; flip pixels become black, since pictures can't flip colors)
+function cursorPng() {
+  const c = document.createElement("canvas"); c.width = c.height = N; const x = c.getContext("2d");
+  for (let y = 0; y < N; y++) for (let i = 0; i < N; i++) {
+    const p = art.px[y][i]; if (!p) continue;
+    x.fillStyle = p === FLIP ? "#000" : p; x.fillRect(i, y, 1, 1);
+  }
+  return c.toDataURL("image/png");
+}
+function applyHere(saved) {
+  document.documentElement.style.cursor = saved ? `url(${saved.png}) ${saved.hx} ${saved.hy}, auto` : "";
+  grid.style.cursor = saved ? `url(${saved.png}) ${saved.hx} ${saved.hy}, crosshair` : "crosshair";
+}
+function info(html) { document.getElementById("infoText").innerHTML = html; document.getElementById("info").style.display = "flex"; }
+document.getElementById("infoOk").onclick = () => document.getElementById("info").style.display = "none";
+
+document.getElementById("done").onclick = () => {
+  if (!art.px.some(r => r.some(Boolean))) { setStatus("Draw something first!"); return; }
+  const saved = { png: cursorPng(), hx: art.hx, hy: art.hy };
+  store.set("cursor-maker", JSON.stringify(saved));       // the Pac-Man Arcade games use it too
+  store.set("cursor-maker-drawing", JSON.stringify(art));
+  applyHere(saved);
+  const a = document.createElement("a"); a.href = saved.png; a.download = "my-cursor.png"; a.click();
+  setStatus("Done! You're using your cursor in Cursor Maker and the Pac-Man Arcade games.");
+  const sys = isMac ? "Mac" : isChromeOS ? "Chromebook" : "computer";
+  let how = "";
+  if (isMac) how = "To change the Mac's own pointer as much as a Mac allows: System Settings &gt; Accessibility &gt; Display &gt; " +
+                   "<b>Pointer</b> - pick its outline and fill colors and its size.";
+  else if (isChromeOS) how = "To change the Chromebook's own pointer as much as ChromeOS allows: Settings &gt; Accessibility &gt; " +
+                             "Cursor and touchpad - pick a <b>cursor color</b> and <b>size</b>.";
+  else how = "On Windows, use the Windows Cursor Maker from the USB - it changes the real pointer everywhere.";
+  info(`Your cursor is on inside <b>Cursor Maker</b> and the <b>Pac-Man Arcade</b> games, and it was saved as ` +
+       `<b>my-cursor.png</b> in your Downloads.<br><br>A ${sys} doesn't let apps replace its main mouse pointer with a drawing. ${how}`);
+};
+document.getElementById("normal").onclick = () => { store.del("cursor-maker"); applyHere(null); setStatus("The normal cursor is back in the apps."); };
+
+try { const s = JSON.parse(store.get("cursor-maker")); if (s && s.png) applyHere(s); } catch (e) {}
+draw();
+
+// ---------------------------------------------------------------- Open / Cancel / Uninstall (Chromebook app window)
+if (LAUNCH_MENU) {
+  const L = document.getElementById("launch"); L.style.display = "flex";
+  // a newer version on the USB? (ChromeOS shows USB drives at file:///media/removable/<USB name>/)
+  const APP_VERSION = "2026.10.21.1";
+  const newerThan = (a, b) => { const x = String(a).split("."), y = String(b).split("."); for (let i = 0; i < Math.max(x.length, y.length); i++) { const p = +x[i] || 0, q = +y[i] || 0; if (p !== q) return p > q; } return false; };
+  if (location.protocol === "file:") ["3DPRINT", "USB DRIVE", "NO NAME", "UNTITLED"].forEach(label => {
+    const s = document.createElement("script");
+    s.src = "file:///media/removable/" + encodeURIComponent(label) + "/Cursor%20Maker/Chromebook/version.js";
+    s.onload = () => {
+      if (!newerThan(window.USB_VERSION, APP_VERSION)) return;
+      document.getElementById("launchMsg").innerHTML = "<b>A newer version is on the USB (version " + window.USB_VERSION + ").</b><br>" +
+        "To update: open Files &gt; the USB &gt; Cursor Maker &gt; Chromebook, and drag the <b>app</b> folder " +
+        "onto your copy in My files (choose Replace). Then reopen the app.";
+    };
+    s.onerror = () => s.remove();
+    document.head.appendChild(s);
+  });
+
+  L.querySelectorAll("button").forEach(b => b.onclick = () => {
+    const act = b.dataset.act;
+    if (act === "open") L.style.display = "none";
+    else if (act === "cancel") { window.close(); document.getElementById("launchMsg").textContent = "You can close this window now."; }
+    else document.getElementById("launchMsg").innerHTML = "To uninstall: right-click <b>Cursor Maker</b> in the Launcher &gt; <b>Uninstall</b>, " +
+                                                         "then delete its folder from <b>My files</b>.";
+  });
+}
+</script>
+<a href="/games/" aria-label="All games" style="position:fixed;right:max(10px,env(safe-area-inset-right,0px));bottom:max(10px,env(safe-area-inset-bottom,0px));z-index:2147483000;background:rgba(0,0,0,.6);color:#fff;font:600 13px system-ui,sans-serif;padding:7px 11px;border-radius:10px;text-decoration:none">&#8962; All games</a>
+</body>
+</html>

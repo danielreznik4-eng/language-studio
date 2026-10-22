@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Spin the Wheel</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { --bg: #14122b; --panel: #221f45; --text: #fff; --dim: #a9a6d0; --accent: #ff6b6b; --yellow: #ffd43b; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: radial-gradient(circle at 40% 30%, #2b2760, var(--bg)); color: var(--text); font-family: "Segoe UI", system-ui, sans-serif; min-height: 100vh; }
+  main { display: flex; gap: 28px; padding: 20px 16px; justify-content: center; flex-wrap: wrap; align-items: flex-start; }
+  h1 { margin: 0 0 6px; font-size: 30px; }
+  .wheelbox { position: relative; width: min(560px, calc(100vw - 32px)); }
+  canvas { width: 100%; height: auto; display: block; cursor: pointer; }
+  .pointer { position: absolute; top: -6px; left: 50%; transform: translateX(-50%); width: 0; height: 0;
+             border-left: 22px solid transparent; border-right: 22px solid transparent; border-top: 44px solid var(--yellow); filter: drop-shadow(0 3px 3px rgba(0,0,0,.5)); }
+  button { font: inherit; font-weight: 700; border: 0; border-radius: 10px; padding: 10px 16px; cursor: pointer; background: rgba(255,255,255,.12); color: #fff; }
+  button:hover { background: rgba(255,255,255,.2); }
+  #spin { background: var(--accent); font-size: 22px; padding: 14px 40px; display: block; margin: 14px auto 0; box-shadow: 0 6px 0 #c92a2a; }
+  #spin:active { transform: translateY(3px); box-shadow: 0 3px 0 #c92a2a; }
+  #spin:disabled { opacity: .6; }
+  .side { width: 330px; max-width: 100%; background: var(--panel); border-radius: 14px; padding: 16px; }
+  .side h2 { margin: 0 0 8px; font-size: 20px; }
+  textarea { width: 100%; height: 260px; font: inherit; font-size: 16px; padding: 8px 10px; border-radius: 8px; border: 2px solid #3d3970; background: #15132e; color: #fff; resize: vertical; }
+  .presets { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+  .presets button { padding: 6px 10px; font-size: 13px; }
+  label { display: block; margin: 8px 0; color: var(--dim); cursor: pointer; }
+  .hint { color: var(--dim); font-size: 13px; }
+  #winner { position: fixed; inset: 0; background: rgba(10,8,30,.75); display: none; align-items: center; justify-content: center; z-index: 5; }
+  #winner .card { background: #fff; color: #222; border-radius: 18px; padding: 26px 34px; text-align: center; min-width: 300px; box-shadow: 0 20px 50px rgba(0,0,0,.5); animation: pop .35s ease-out; }
+  #winner .name { font-size: 42px; font-weight: 900; margin: 6px 0 16px; word-break: break-word; }
+  #winner button { background: #4c6ef5; } #winner #removeBtn { background: #868e96; }
+  @keyframes pop { from { transform: scale(.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  #confetti { position: fixed; inset: 0; pointer-events: none; z-index: 6; }
+  .hist { margin-top: 10px; font-size: 14px; color: var(--dim); }
+  #launch { position: fixed; inset: 0; background: rgba(10,8,30,.88); display: none; align-items: center; justify-content: center; z-index: 9; }
+  #launch .box { background: var(--panel); border-radius: 14px; padding: 22px; width: 360px; text-align: center; border: 2px solid var(--accent); }
+  #launch .row { display: flex; gap: 8px; } #launch .row button { flex: 1; } #launch .row button:first-child { background: var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <div>
+    <h1>🎡 Spin the Wheel</h1>
+    <div class="wheelbox"><div class="pointer"></div><canvas id="wheel" width="1000" height="1000" title="Click to spin"></canvas></div>
+    <button id="spin">SPIN!</button>
+    <div class="hint" style="text-align:center;margin-top:8px">Click the wheel, press SPIN, or press the Space bar.</div>
+  </div>
+  <div class="side">
+    <h2>Choices</h2>
+    <div class="hint">One per line (2 to 40 choices).</div>
+    <textarea id="items" spellcheck="false"></textarea>
+    <div class="presets">
+      <button data-p="yesno">Yes / No</button><button data-p="nums">1 - 10</button><button data-p="food">Food</button>
+      <button data-p="games">Games</button><button data-p="chores">Chores</button><button data-p="shuffle">Shuffle</button>
+    </div>
+    <label><input type="checkbox" id="removeWin"> Remove the winner after each spin</label>
+    <label><input type="checkbox" id="sound" checked> Sound</label>
+    <div class="hist" id="hist"></div>
+  </div>
+</main>
+<div id="winner"><div class="card"><div style="font-weight:700;color:#868e96">THE WHEEL PICKED...</div><div class="name" id="winName"></div>
+  <button id="okBtn">Yay!</button> <button id="removeBtn">Remove it from the wheel</button></div></div>
+<canvas id="confetti"></canvas>
+
+<div id="launch"><div class="box"><h2 style="margin:0 0 4px">Spin the Wheel</h2><div style="color:var(--dim);margin-bottom:14px">Let the wheel decide!</div>
+  <div class="row"><button data-act="open">Open</button><button data-act="cancel">Cancel</button><button data-act="uninstall">Uninstall</button></div>
+  <div id="launchMsg" style="margin-top:10px;font-size:13px;color:var(--yellow)"></div></div></div>
+
+<script>
+"use strict";
+const LAUNCH_MENU = false;   // true in copies without a Windows/Mac start-up box
+const PRESETS = {
+  yesno: ["Yes", "No"],
+  nums: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"],
+  food: ["Pizza", "Tacos", "Burgers", "Pasta", "Sushi", "Chicken", "Salad", "Pancakes"],
+  games: ["Minecraft", "Pac-Man", "Traffic Rush", "Board game", "Tag outside", "Hide and seek", "Cards", "Puzzle"],
+  chores: ["Dishes", "Take out trash", "Feed the pet", "Make the bed", "Vacuum", "Fold laundry"],
+};
+const COLORS = ["#ff6b6b", "#ffa94d", "#ffd43b", "#69db7c", "#38d9a9", "#4dabf7", "#748ffc", "#da77f2", "#f783ac", "#a9e34b"];
+const wheel = document.getElementById("wheel"), g = wheel.getContext("2d"), itemsBox = document.getElementById("items");
+let rot = 0, spinning = false, lastTick = -1, history = [], winnerIndex = -1;
+
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem("spin-wheel")) || {}; } catch (e) {}
+itemsBox.value = (saved.items || PRESETS.food).join("\n");
+document.getElementById("removeWin").checked = !!saved.removeWin;
+const items = () => itemsBox.value.split("\n").map(s => s.trim()).filter(Boolean).slice(0, 40);
+function store() { try { localStorage.setItem("spin-wheel", JSON.stringify({ items: items(), removeWin: document.getElementById("removeWin").checked })); } catch (e) {} }
+
+let audio = null;
+function tone(f, d, type = "square", v = .05, delay = 0) {
+  if (!document.getElementById("sound").checked) return;
+  try {
+    audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+    const o = audio.createOscillator(), gn = audio.createGain(), t = audio.currentTime + delay;
+    o.type = type; o.frequency.setValueAtTime(f, t); gn.gain.setValueAtTime(v, t); gn.gain.exponentialRampToValueAtTime(.0001, t + d);
+    o.connect(gn).connect(audio.destination); o.start(t); o.stop(t + d);
+  } catch (e) {}
+}
+
+function draw() {
+  const list = items(), n = Math.max(list.length, 1), R = 480, C = 500, slice = Math.PI * 2 / n;
+  g.clearRect(0, 0, 1000, 1000);
+  g.save(); g.translate(C, C); g.rotate(rot);
+  for (let i = 0; i < n; i++) {
+    g.beginPath(); g.moveTo(0, 0); g.arc(0, 0, R, i * slice - Math.PI / 2, (i + 1) * slice - Math.PI / 2); g.closePath();
+    g.fillStyle = list.length ? COLORS[(i + (n % COLORS.length === 1 && i === n - 1 ? 1 : 0)) % COLORS.length] : "#444"; g.fill();
+    g.strokeStyle = "rgba(255,255,255,.7)"; g.lineWidth = 4; g.stroke();
+    if (!list.length) continue;
+    g.save(); g.rotate(i * slice + slice / 2 - Math.PI / 2);
+    g.textAlign = "right"; g.textBaseline = "middle"; g.fillStyle = "#1b1b2f";
+    let size = Math.min(54, Math.max(20, 900 / n)), label = list[i];
+    g.font = `bold ${size}px "Segoe UI", sans-serif`;
+    while (g.measureText(label).width > R - 110 && label.length > 3) label = label.slice(0, -2) + "…";
+    g.fillText(label, R - 30, 0); g.restore();
+  }
+  g.restore();
+  g.beginPath(); g.arc(C, C, R, 0, Math.PI * 2); g.lineWidth = 14; g.strokeStyle = "#fff"; g.stroke();
+  g.beginPath(); g.arc(C, C, 62, 0, Math.PI * 2); g.fillStyle = "#fff"; g.fill(); g.lineWidth = 6; g.strokeStyle = "#ddd"; g.stroke();
+  g.fillStyle = "#ff6b6b"; g.font = "bold 34px 'Segoe UI'"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText("SPIN", C, C);
+}
+
+// which slice is under the pointer (top of the wheel)
+function pointed(n) {
+  const slice = Math.PI * 2 / n;
+  let a = (-rot) % (Math.PI * 2); if (a < 0) a += Math.PI * 2;
+  return Math.floor(a / slice) % n;
+}
+
+function spin() {
+  const list = items();
+  if (spinning) return;
+  if (list.length < 2) { alert("Put at least 2 choices on the wheel (one per line)."); return; }
+  spinning = true; document.getElementById("spin").disabled = true; store();
+  const start = rot, extra = (5 + Math.random() * 4) * Math.PI * 2 + Math.random() * Math.PI * 2;   // fair: random stopping angle
+  const dur = 4200 + Math.random() * 1600, t0 = performance.now();
+  lastTick = pointed(list.length);
+  function step(now) {
+    const t = Math.min(1, (now - t0) / dur), ease = 1 - Math.pow(1 - t, 4);
+    rot = start + extra * ease; draw();
+    const p = pointed(list.length);
+    if (p !== lastTick) { lastTick = p; tone(1300, .03, "square", .04); }
+    if (t < 1) requestAnimationFrame(step);
+    else { spinning = false; document.getElementById("spin").disabled = false; winnerIndex = p; showWinner(list[p]); }
+  }
+  requestAnimationFrame(step);
+}
+
+function showWinner(name) {
+  document.getElementById("winName").textContent = name;
+  document.getElementById("winner").style.display = "flex";
+  tone(523, .15, "triangle", .08); tone(659, .15, "triangle", .08, .12); tone(784, .3, "triangle", .08, .24);
+  history.unshift(name); history = history.slice(0, 8);
+  document.getElementById("hist").textContent = "Last picks: " + history.join(", ");
+  confetti();
+  if (document.getElementById("removeWin").checked) removeWinner();
+}
+function removeWinner() {
+  const list = items(); if (winnerIndex < 0 || winnerIndex >= list.length) return;
+  list.splice(winnerIndex, 1); winnerIndex = -1;
+  itemsBox.value = list.join("\n"); store(); draw();
+}
+
+// confetti
+const cf = document.getElementById("confetti"), cg = cf.getContext("2d"); let bits = [];
+function confetti() {
+  cf.width = innerWidth; cf.height = innerHeight;
+  for (let i = 0; i < 160; i++) bits.push({ x: innerWidth / 2, y: innerHeight / 2, vx: (Math.random() - .5) * 18, vy: Math.random() * -16 - 4, c: COLORS[i % COLORS.length], s: 6 + Math.random() * 6, r: Math.random() * 6, t: 120 });
+  if (bits.length === 160) requestAnimationFrame(fall);
+}
+function fall() {
+  cg.clearRect(0, 0, cf.width, cf.height);
+  bits = bits.filter(b => (b.x += b.vx, b.y += b.vy, b.vy += .45, b.vx *= .99, b.r += .2, --b.t > 0));
+  for (const b of bits) { cg.save(); cg.translate(b.x, b.y); cg.rotate(b.r); cg.fillStyle = b.c; cg.fillRect(-b.s / 2, -b.s / 4, b.s, b.s / 2); cg.restore(); }
+  if (bits.length) requestAnimationFrame(fall); else cg.clearRect(0, 0, cf.width, cf.height);
+}
+
+document.getElementById("spin").onclick = spin;
+wheel.onclick = spin;
+document.getElementById("okBtn").onclick = () => document.getElementById("winner").style.display = "none";
+document.getElementById("removeBtn").onclick = () => { removeWinner(); document.getElementById("winner").style.display = "none"; };
+itemsBox.oninput = () => { store(); if (!spinning) draw(); };
+document.getElementById("removeWin").onchange = store;
+document.querySelectorAll("[data-p]").forEach(b => b.onclick = () => {
+  if (spinning) return;
+  if (b.dataset.p === "shuffle") { const l = items(); for (let i = l.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [l[i], l[j]] = [l[j], l[i]]; } itemsBox.value = l.join("\n"); }
+  else itemsBox.value = PRESETS[b.dataset.p].join("\n");
+  store(); draw();
+});
+addEventListener("keydown", e => {
+  if (document.activeElement === itemsBox) return;
+  if (e.code === "Space" || e.key === "Enter") {
+    e.preventDefault();
+    if (document.getElementById("winner").style.display === "flex") document.getElementById("winner").style.display = "none"; else spin();
+  }
+});
+addEventListener("visibilitychange", () => { if (audio) document.hidden ? audio.suspend() : audio.resume(); });
+draw();
+
+if (LAUNCH_MENU) {
+  const L = document.getElementById("launch"); L.style.display = "flex";
+  L.querySelectorAll("button").forEach(b => b.onclick = () => {
+    const act = b.dataset.act;
+    if (act === "open") L.style.display = "none";
+    else if (act === "cancel") { window.close(); document.getElementById("launchMsg").textContent = "You can close this window now."; }
+    else document.getElementById("launchMsg").innerHTML = "To uninstall: right-click <b>Spin the Wheel</b> in the Launcher &gt; Uninstall.";
+  });
+}
+</script>
+<a href="/games/" aria-label="All games" style="position:fixed;right:max(10px,env(safe-area-inset-right,0px));bottom:max(10px,env(safe-area-inset-bottom,0px));z-index:2147483000;background:rgba(0,0,0,.6);color:#fff;font:600 13px system-ui,sans-serif;padding:7px 11px;border-radius:10px;text-decoration:none">&#8962; All games</a>
+</body>
+</html>
