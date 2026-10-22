@@ -1,4 +1,4 @@
-// Lesson Studio server: serves the app (and English Coach at /english), saves lessons, and relays live
+// Lesson Studio server: serves the app (and English Coach at /english, Click Arcade at /arcade), saves lessons, and relays live
 // messages (slides, answers, chat, screen-share signaling) inside private rooms. Each teacher gets a
 // room code; only people with that code see that lesson. No extra packages needed.
 // Runs on your own computer (Start Lesson Studio.bat) or on a host like Render (uses $PORT).
@@ -20,7 +20,7 @@ const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; ch
 
 const safeName = n => String(n || "").replace(/[^\p{L}\p{N} _.-]/gu, "").trim().slice(0, 80);
 // rooms are simple names used in the link: /daniel, /babushka-lessons
-const RESERVED = new Set(["english", "api", "ws", "index", "public"]);
+const RESERVED = new Set(["english", "api", "ws", "index", "public", "arcade"]);
 const cleanCode = c => String(c || "").toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 32);
 const validRoom = c => c.length >= 2 && !RESERVED.has(c);
 const newCode = () => { let c; do { c = "class-" + crypto.randomBytes(3).toString("hex"); } while (rooms.has(c)); return c; };
@@ -56,6 +56,54 @@ function turnCredentials(req) {
   return { urls: TURN_URLS, username, credential, ttl: TURN_TTL };
 }
 setInterval(() => { const t = Date.now() - 120000; for (const [k, v] of turnHits) if (v[1] < t) turnHits.delete(k); }, 300000).unref();
+
+
+// ---- Click Arcade leaderboards (/arcade). Each player's progress lives in their own browser and is re-sent every
+// visit, so if the free host wipes this file while the site sleeps, the boards fill back up as players return.
+const ARCADE_FILE = path.join(ROOT, "arcade-scores.json");
+const arcade = new Map();   // secret player id -> { name, stats..., at }
+try { for (const [k, v] of Object.entries(JSON.parse(fs.readFileSync(ARCADE_FILE, "utf8")))) arcade.set(k, v); } catch (e) {}
+let arcadeTimer = null;
+function arcadeStore() {
+  clearTimeout(arcadeTimer);
+  arcadeTimer = setTimeout(() => { try { fs.writeFileSync(ARCADE_FILE, JSON.stringify(Object.fromEntries(arcade))); } catch (e) {} }, 3000);
+}
+const arcadeHits = new Map();   // secret id -> last write time (a light limit)
+const num = (v, max) => Math.max(0, Math.min(max, Math.floor(Number(v) || 0)));
+function arcadeClean(body) {
+  const id = String(body.id || "");
+  if (!/^[a-z0-9-]{16,64}$/i.test(id)) return null;
+  const name = String(body.name || "").replace(/[^\p{L}\p{N} _.-]/gu, "").replace(/\s+/g, " ").trim().slice(0, 16);
+  const s = body.stats || {};
+  const clicks = num(s.clicks, 20000000);
+  return { id, row: {
+    name, clicks, points: Math.min(clicks, num(s.points, 20000000)),
+    day: /^\d{4}-\d\d-\d\d$/.test(String(s.day || "")) ? String(s.day) : "",
+    streak: num(s.streak, 5000), bestCps: num(s.bestCps, 25),
+    dotBest: num(s.dotBest, 1000), dotGames: num(s.dotGames, 1000000),
+    zKills: num(s.zKills, 50000000), zBestWave: num(s.zBestWave, 10000), at: Date.now() } };
+}
+function arcadeApi(req, res, url, json) {
+  res.setHeader("Cache-Control", "no-store");
+  if (url.pathname === "/api/arcade/board" && req.method === "GET") {
+    const me = String(url.searchParams.get("me") || "");
+    const players = [...arcade.entries()].map(([id, v]) => Object.assign({}, v, { me: id === me, at: undefined }));
+    return json(200, { players });
+  }
+  if (url.pathname === "/api/arcade/score" && req.method === "POST") return readBody(req, 8 * 1024, body => {
+    let c = null;
+    try { c = arcadeClean(JSON.parse(body)); } catch (e) {}
+    if (!c) return json(400, { error: "bad score" });
+    const now = Date.now(), last = arcadeHits.get(c.id) || 0;
+    if (now - last < 800) return json(429, { error: "slow down" });
+    arcadeHits.set(c.id, now);
+    if (!arcade.has(c.id) && arcade.size >= 5000) return json(507, { error: "leaderboard is full" });
+    arcade.set(c.id, c.row); arcadeStore();
+    return json(200, { ok: true });
+  });
+  return json(404, {});
+}
+setInterval(() => { const t = Date.now() - 60000; for (const [k, v] of arcadeHits) if (v < t) arcadeHits.delete(k); }, 300000).unref();
 
 const server = http.createServer((req, res) => {
   if (insecure(req)) { res.writeHead(301, { Location: "https://" + req.headers.host + req.url }); return res.end(); }
@@ -98,11 +146,13 @@ const server = http.createServer((req, res) => {
     res.setHeader("Cache-Control", "no-store");
     return c ? json(200, c) : json(429, { error: "slow down" });
   }
+  if (url.pathname.startsWith("/api/arcade/")) return arcadeApi(req, res, url, json);
   if (url.pathname === "/api/info") return json(200, { addresses: lanAddresses(), port: PORT, hosted: !!process.env.PORT });
   // ---- static files ( /english -> English Coach )
   let p = url.pathname;
   if (p === "/") p = "/index.html";
   if (p === "/english" || p === "/english/") p = "/english/index.html";
+  else if (p === "/arcade" || p === "/arcade/") p = "/arcade/index.html";
   else if (/^\/[a-z0-9-]{2,32}\/?$/i.test(p) && validRoom(cleanCode(p))) p = "/index.html";   // /daniel -> the app, joining room "daniel"
   const file = path.normalize(path.join(PUBLIC, decodeURIComponent(p)));
   if (!file.startsWith(PUBLIC) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) { res.writeHead(404); return res.end("not found"); }
@@ -286,5 +336,6 @@ server.listen(PORT, "0.0.0.0", () => {
   console.log("  Teacher (this computer):  http://localhost:" + PORT);
   for (const a of lanAddresses()) console.log("  Student (same Wi-Fi):     http://" + a + ":" + PORT + "/<teacher-name>");
   console.log("  English Coach:            http://localhost:" + PORT + "/english");
+  console.log("  Click Arcade:             http://localhost:" + PORT + "/arcade");
   console.log("\n  Keep this window open while you use the app. Close it to stop.\n");
 });

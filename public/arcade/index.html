@@ -1,0 +1,980 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}body{margin:0;font:14px system-ui}img{max-width:100%}[hidden]{display:none!important}</style></head><body>
+<title>Click Arcade</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Outfit:wght@400;600;800&display=swap">
+<style>
+  /* Layout: a one-screen arcade - the big white box on a blue field, with a side panel (Leaderboard / Shop / Achievements). */
+  :root {
+    color-scheme: dark;
+    --field: #1556c4;       /* the blue screen */
+    --field-deep: #0d3f99;
+    --panel: #0b2f73;
+    --panel-line: #2a63c9;
+    --box: #ffffff;
+    --ink: #0d3f99;          /* text on the white box */
+    --text: #ffffff;
+    --muted: #b9cdf3;
+    --gold: #ffd43b;
+    --red: #fa5252;
+    --good: #69db7c;
+    --warn: #ffa94d;
+    --font-display: "Bungee", "Arial Black", Impact, sans-serif;
+    --font-body: "Outfit", "Segoe UI", system-ui, sans-serif;
+  }
+  html, body { height: 100%; }
+  body { background: var(--field); color: var(--text); font-family: var(--font-body); font-size: 15px; overflow: hidden;
+         -webkit-user-select: none; user-select: none; }
+  #fx { position: fixed; inset: 0; pointer-events: none; z-index: 20; }
+  .app { position: relative; height: 100%; display: grid; grid-template-columns: minmax(0, 1fr) 340px; }
+  .stage { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px;
+           padding-block: 16px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: 16px; min-width: 0;
+           background: radial-gradient(circle at 50% 42%, #1f6be0, var(--field) 55%, var(--field-deep)); }
+  .cps { position: absolute; top: 14px; left: 0; right: 0; text-align: center; }
+  .cps b { display: block; font-family: var(--font-display); font-size: 44px; letter-spacing: 1px; font-weight: 400; line-height: 1.1; }
+  .cps span { color: var(--muted); font-size: 14px; }
+  #box { width: min(320px, 78vw); aspect-ratio: 16 / 10; max-width: 100%; background: var(--box); color: var(--ink); border: 0; border-radius: 22px;
+         font-family: var(--font-display); font-size: clamp(30px, 6vw, 44px); letter-spacing: 2px; cursor: pointer;
+         box-shadow: 0 12px 0 rgba(0, 0, 0, .28); transition: transform .06s ease-out, box-shadow .06s; touch-action: manipulation; }
+  #box.down { transform: translateY(7px) scale(.95); box-shadow: 0 4px 0 rgba(0, 0, 0, .28); }
+  #box:focus-visible { outline: 4px solid var(--gold); outline-offset: 6px; }
+  .tally { text-align: center; }
+  .tally b { font-family: var(--font-display); font-weight: 400; font-size: 34px; font-variant-numeric: tabular-nums; display: block; }
+  .tally span { color: var(--muted); font-size: 14px; }
+  .goal { width: min(460px, 86%); }
+  .bar { height: 12px; background: rgba(255, 255, 255, .22); border-radius: 6px; overflow: hidden; }
+  .bar i { display: block; height: 100%; width: 0; background: var(--box); border-radius: 6px; }
+  .goal p { margin: 6px 0 0; text-align: center; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+  .chip { background: rgba(0, 0, 0, .22); border-radius: 20px; padding: 4px 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .chip.gold { color: var(--gold); }
+  .side { background: var(--panel); border-left: 2px solid var(--panel-line); display: flex; flex-direction: column; min-height: 0; min-width: 0;
+          padding-right: env(safe-area-inset-right, 0px); }
+  .tabs { display: grid; grid-template-columns: repeat(3, 1fr); border-bottom: 2px solid var(--panel-line); }
+  .tabs button { background: none; border: 0; color: var(--muted); font: 600 14px var(--font-body); padding: 14px 4px; cursor: pointer; }
+  .tabs button[aria-selected="true"] { color: var(--text); box-shadow: inset 0 -3px 0 var(--gold); }
+  .tabs button:focus-visible { outline: 2px solid var(--gold); outline-offset: -4px; }
+  .pane { flex: 1; overflow-y: auto; padding: 14px 16px 20px; min-height: 0; }
+  .note { color: var(--muted); font-size: 13px; line-height: 1.45; margin: 0 0 12px; }
+  .note b { color: var(--text); }
+  ol.board { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .row { display: grid; grid-template-columns: 26px 30px minmax(0, 1fr) auto; gap: 8px; align-items: center; background: rgba(255, 255, 255, .06);
+         border-radius: 10px; padding: 7px 10px; }
+  .row.me { background: rgba(255, 212, 59, .16); outline: 1px solid rgba(255, 212, 59, .5); }
+  .rank { font-family: var(--font-display); color: var(--muted); font-size: 14px; text-align: center; }
+  .row:nth-child(1) .rank { color: var(--gold); }
+  .row img { width: 30px; height: 30px; border-radius: 50%; }
+  .who { min-width: 0; }
+  .who div { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .who small { color: var(--muted); font-size: 12px; }
+  .who small.warn { color: var(--warn); }
+  .pts { font-weight: 800; font-variant-numeric: tabular-nums; text-align: right; }
+  .shop { display: grid; gap: 8px; }
+  .item { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 10px; align-items: center; background: rgba(255, 255, 255, .06); border-radius: 12px; padding: 9px 10px; }
+  .item canvas { width: 44px; height: 44px; border-radius: 10px; background: var(--field); }
+  .item h4 { margin: 0; font-size: 15px; } .item p { margin: 2px 0 0; color: var(--muted); font-size: 12px; }
+  .item button { font: 700 13px var(--font-body); border: 0; border-radius: 8px; padding: 8px 12px; cursor: pointer; min-width: 84px; }
+  .buy { background: var(--gold); color: #3a2c00; } .buy:disabled { background: rgba(255, 255, 255, .15); color: var(--muted); cursor: not-allowed; }
+  .use { background: var(--box); color: var(--ink); } .using { background: transparent; color: var(--good); outline: 1px solid var(--good); cursor: default; }
+  .ach { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .badge { border-radius: 12px; padding: 10px; background: rgba(255, 255, 255, .05); border: 1px dashed rgba(255, 255, 255, .2); }
+  .badge.on { background: rgba(255, 212, 59, .14); border: 1px solid rgba(255, 212, 59, .55); }
+  .badge b { display: block; font-size: 14px; } .badge span { color: var(--muted); font-size: 12px; }
+  .badge.on b { color: var(--gold); }
+  .toast { position: fixed; left: 50%; top: calc(16px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); z-index: 30; background: var(--gold); color: #3a2c00;
+           padding: 10px 18px; border-radius: 12px; font-weight: 800; box-shadow: 0 6px 18px rgba(0, 0, 0, .3); animation: drop .3s ease-out; }
+  @keyframes drop { from { transform: translate(-50%, -30px); opacity: 0; } }
+  .win { position: fixed; inset: 0; background: rgba(13, 63, 153, .94); z-index: 25; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px; }
+  .win h2 { font-family: var(--font-display); font-weight: 400; color: var(--gold); font-size: clamp(28px, 7vw, 52px); margin: 0; }
+  .confirm { display: flex; gap: 8px; margin-top: 8px; }
+  .confirm button, .linkbtn { font: 600 13px var(--font-body); border: 0; border-radius: 8px; padding: 6px 10px; cursor: pointer; }
+  .linkbtn { background: none; color: var(--muted); text-decoration: underline; padding: 0; }
+  .screen[hidden] { display: none !important; }
+  #screen-title { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 26px; text-align: center;
+                  padding-block: 20px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+                  background: radial-gradient(circle at 50% 40%, #1f6be0, var(--field) 55%, var(--field-deep)); overflow-y: auto; }
+  #screen-title h1 { font-family: var(--font-display); font-weight: 400; font-size: clamp(38px, 9vw, 76px); margin: 0; letter-spacing: 2px; line-height: 1; text-wrap: balance; }
+  #screen-title h1 span { color: var(--gold); }
+  .picks { display: flex; gap: 18px; flex-wrap: wrap; justify-content: center; }
+  .pick { width: 220px; max-width: 100%; background: var(--panel); border: 3px solid var(--panel-line); border-radius: 18px; padding: 18px; color: var(--text);
+          cursor: pointer; font: inherit; text-align: center; display: grid; gap: 8px; justify-items: center; }
+  .pick[aria-selected="true"], .pick:hover { border-color: var(--gold); }
+  .pick:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+  .pick b { font-family: var(--font-display); font-weight: 400; font-size: 21px; }
+  .pick span { color: var(--muted); font-size: 13px; line-height: 1.35; }
+  .pick .art { width: 120px; height: 70px; border-radius: 12px; display: flex; align-items: center; justify-content: center; gap: 8px; }
+  .art.click { background: var(--field); } .art.click i { width: 70px; height: 42px; background: var(--box); border-radius: 8px; display: block; }
+  .art.dot { background: #0a1f4d; } .art.dot i { width: 26px; height: 26px; background: var(--red); border-radius: 50%; display: block; box-shadow: 0 0 0 6px rgba(250, 82, 82, .3); }
+  .art.zed { background: #2b4a2a; } .art.zed i { width: 22px; height: 22px; border-radius: 50%; background: #69a85a; display: block; box-shadow: inset 0 0 0 3px #3d6b33; }
+  .art.zed i.big { width: 38px; height: 38px; background: #3f7a34; } .art.zed i.you { background: #4dabf7; box-shadow: 0 0 0 3px #fff; }
+  .hint { color: var(--muted); font-size: 13px; }
+  .back { position: absolute; top: calc(12px + env(safe-area-inset-top, 0px)); left: max(12px, env(safe-area-inset-left, 0px)); z-index: 5; background: rgba(0, 0, 0, .3);
+          color: var(--text); border: 0; border-radius: 10px; padding: 8px 12px; font: 600 14px var(--font-body); cursor: pointer; }
+  .back:focus-visible { outline: 2px solid var(--gold); }
+  .dotfield, .zfield { position: relative; min-width: 0; overflow: hidden; }
+  .dotfield { background: radial-gradient(circle at 50% 45%, #12357f, #0a1f4d); cursor: crosshair; }
+  #dot { position: absolute; border-radius: 50%; background: var(--red); border: 0; padding: 0; cursor: pointer; transform: translate(-50%, -50%);
+         box-shadow: 0 0 0 4px rgba(250, 82, 82, .28), 0 4px 10px rgba(0, 0, 0, .4); }
+  #dot svg { position: absolute; inset: -9px; width: calc(100% + 18px); height: calc(100% + 18px); transform: rotate(-90deg); pointer-events: none; }
+  #dot circle { fill: none; stroke: #fff; stroke-width: 3; stroke-linecap: round; }
+  .hud { position: absolute; top: 14px; left: 0; right: 0; text-align: center; pointer-events: none; z-index: 2; }
+  .hud b { font-family: var(--font-display); font-weight: 400; font-size: 40px; display: block; line-height: 1.1; }
+  .hud span { color: var(--muted); font-size: 14px; }
+  .card { position: absolute; inset: 0; z-index: 3; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; text-align: center; padding: 20px;
+          background: rgba(10, 31, 77, .78); }
+  .card h2 { font-family: var(--font-display); font-weight: 400; font-size: clamp(26px, 6vw, 44px); margin: 0; }
+  .card p { margin: 0; color: var(--muted); max-width: 38ch; line-height: 1.45; }
+  .card p b { color: var(--text); }
+  .go { background: var(--red); color: #fff; border: 0; border-radius: 12px; padding: 12px 28px; font: 400 20px var(--font-display); cursor: pointer; }
+  .go:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+  .zfield { background: #22381f; }
+  #zcanvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .zbar { position: absolute; left: 50%; transform: translateX(-50%); bottom: 16px; width: min(320px, 70%); z-index: 2; pointer-events: none; }
+  .zbar .bar { height: 14px; background: rgba(0, 0, 0, .45); } .zbar .bar i { background: var(--good); }
+  .zbar p { margin: 4px 0 0; text-align: center; font-size: 13px; font-weight: 600; }
+  .ups { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+  .up { width: 170px; background: var(--panel); border: 2px solid var(--panel-line); border-radius: 14px; padding: 14px; color: var(--text); font: inherit; cursor: pointer; display: grid; gap: 4px; }
+  .up:hover, .up:focus-visible { border-color: var(--gold); outline: none; }
+  .up b { font-size: 16px; } .up span { color: var(--muted); font-size: 13px; } .up kbd { font: 700 12px var(--font-body); color: var(--gold); }
+  .namebar { margin: 0 0 12px; }
+  .namebar label { display: grid; gap: 4px; color: var(--muted); font-size: 12px; font-weight: 600; }
+  .namebar input { font: 600 15px var(--font-body); padding: 8px 10px; border-radius: 8px; border: 2px solid var(--panel-line); background: var(--field-deep); color: var(--text); }
+  .namebar input:focus { outline: none; border-color: var(--gold); }
+  @media (max-width: 760px) {
+    body { overflow: auto; }
+    .app { grid-template-columns: 1fr; height: auto; min-height: 100%; }
+    .stage { min-height: 78vh; padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+    .side { border-left: 0; border-top: 2px solid var(--panel-line); padding-left: max(0px, env(safe-area-inset-left, 0px)); }
+    .pane { overflow: visible; }
+    .dotfield, .zfield { min-height: 72vh; }
+  }
+  @media (prefers-reduced-motion: reduce) { #box { transition: none; } .toast { animation: none; } }
+</style>
+
+<canvas id="fx"></canvas>
+<main id="screen-title" class="screen">
+  <h1>CLICK <span>ARCADE</span></h1>
+  <div class="picks" role="listbox" aria-label="Pick a game">
+    <button class="pick" id="pick-clicker" role="option" aria-selected="true" type="button"><div class="art click"><i></i></div><b>CLICK ME</b><span>Click the white box. Road to 20 million.</span></button>
+    <button class="pick" id="pick-dot" role="option" aria-selected="false" type="button"><div class="art dot"><i></i></div><b>RED DOT</b><span>Hit the red dot before it vanishes. How long a streak can you get?</span></button>
+    <button class="pick" id="pick-zombie" role="option" aria-selected="false" type="button"><div class="art zed"><i></i><i class="you"></i><i class="big"></i></div><b>ZOMBIE WAVES</b><span>Survive waves of zombies and a boss every 5th wave.</span></button>
+  </div>
+  <div class="hint">Arrow keys to pick, Enter to play · Esc goes back here</div>
+</main>
+<div class="app screen" id="screen-clicker" hidden>
+  <button class="back" type="button" data-back>← Games</button>
+  <section class="stage" aria-label="Click area">
+    <div class="cps"><b id="cps">CPS: 0</b><span id="bestCps">Best CPS: 0</span></div>
+    <button id="box" type="button" aria-label="Click me">CLICK ME</button>
+    <div class="tally"><b id="total">0</b><span>clicks</span></div>
+    <div class="goal"><div class="bar"><i id="fill"></i></div><p id="goalText">0 / 20,000,000 clicks</p></div>
+    <div class="chips"><span class="chip gold" id="coins">0 coins</span><span class="chip" id="streak">No streak yet</span><span class="chip" id="score">Score 0</span></div>
+  </section>
+  <aside class="side">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-board" aria-selected="true">Leaderboard</button>
+      <button role="tab" id="tab-shop" aria-selected="false">Shop</button>
+      <button role="tab" id="tab-ach" aria-selected="false">Achievements</button>
+    </div>
+    <div class="pane" id="pane-board">
+      <div class="namebar"><label>Your name on the boards <input class="nameIn" maxlength="16" placeholder="Type your name" autocomplete="nickname"></label></div>
+      <p class="note">Score = your clicks, but <b>every day you skip, your score drops 10%</b>. Play every day to stay on top. Total clicks and achievements never drop.</p>
+      <ol class="board" id="board"></ol>
+      <p class="note" id="boardNote">Loading the leaderboard...</p>
+    </div>
+    <div class="pane" id="pane-shop" hidden>
+      <p class="note">Every click earns 1 coin. Spend coins on click animations. Spending never lowers your clicks or score.</p>
+      <div class="shop" id="shop"></div>
+    </div>
+    <div class="pane" id="pane-ach" hidden>
+      <p class="note" id="achCount"></p>
+      <div class="ach" id="ach"></div>
+      <p class="note" style="margin-top:18px">Left and right clicks both count. Clicks faster than 25 a second don't count, so autoclickers can't win.</p>
+      <div id="resetArea"><button class="linkbtn" id="reset" type="button">Start over</button></div>
+    </div>
+  </aside>
+</div>
+<div class="app screen" id="screen-dot" hidden>
+  <button class="back" type="button" data-back>← Games</button>
+  <section class="dotfield" id="dotfield" aria-label="Red Dot play area">
+    <div class="hud"><b id="dotStreak">0</b><span id="dotBest">Best streak: 0</span></div>
+    <button id="dot" type="button" aria-label="Red dot" hidden><svg viewBox="0 0 100 100"><circle id="dotRing" cx="50" cy="50" r="46" pathLength="100" stroke-dasharray="100 100"></circle></svg></button>
+    <div class="card" id="dotCard">
+      <h2 id="dotTitle">RED DOT</h2>
+      <p id="dotText">Click the red dot before its ring runs out. Each hit adds 1 to your streak. Miss the dot or run out of time and the run ends. It gets smaller and faster!</p>
+      <button class="go" id="dotGo" type="button">START</button>
+    </div>
+  </section>
+  <aside class="side">
+    <div class="tabs" style="grid-template-columns:1fr"><button role="tab" aria-selected="true" type="button">Best streaks</button></div>
+    <div class="pane">
+<div class="namebar"><label>Your name on the boards <input class="nameIn" maxlength="16" placeholder="Type your name" autocomplete="nickname"></label></div>
+      <p class="note">Ranked by <b>highest streak ever</b>. Each hit also earns 2 coins for the Click Me shop.</p>
+      <ol class="board" id="dotBoard"></ol>
+      <p class="note" id="dotBoardNote">Loading the leaderboard...</p>
+    </div>
+  </aside>
+</div>
+<div class="app screen" id="screen-zombie" hidden>
+  <button class="back" type="button" data-back>← Games</button>
+  <section class="zfield" id="zfield" aria-label="Zombie Waves play area">
+    <canvas id="zcanvas"></canvas>
+    <div class="hud"><b id="zWave">WAVE 1</b><span id="zInfo">0:30 left · 0 kills</span></div>
+    <div class="zbar"><div class="bar"><i id="zHp"></i></div><p id="zHpText">100 / 100</p></div>
+    <div class="card" id="zCard">
+      <h2 id="zTitle">ZOMBIE WAVES</h2>
+      <p id="zText">Move with <b>WASD</b> or the <b>arrow keys</b> (or hold your finger on the screen). You shoot the nearest zombie by yourself. Survive each wave until the timer runs out, then pick an upgrade. A <b>Boss Zombie</b> comes every 5th wave!</p>
+      <div class="ups" id="zUps"></div>
+      <button class="go" id="zGo" type="button">START</button>
+    </div>
+  </section>
+  <aside class="side">
+    <div class="tabs" style="grid-template-columns:1fr"><button role="tab" aria-selected="true" type="button">Most kills ever</button></div>
+    <div class="pane">
+<div class="namebar"><label>Your name on the boards <input class="nameIn" maxlength="16" placeholder="Type your name" autocomplete="nickname"></label></div>
+      <p class="note" id="zMine">Your kills ever: 0 · Best wave: 0</p>
+      <p class="note">Ranked by <b>all-time zombie kills</b>. Each kill also earns 1 coin for the Click Me shop.</p>
+      <ol class="board" id="zBoard"></ol>
+      <p class="note" id="zBoardNote">Loading the leaderboard...</p>
+    </div>
+  </aside>
+</div>
+
+<script>
+"use strict";
+const GOAL = 20000000, MAX_CPS = 25, DECAY = 0.9;
+const $ = id => document.getElementById(id);
+const fmt = n => Math.floor(n).toLocaleString("en-US");
+const short = n => n >= 1e6 ? (n / 1e6).toLocaleString("en-US", { maximumFractionDigits: 1 }) + "M" : n >= 1e3 ? (n / 1e3).toLocaleString("en-US", { maximumFractionDigits: 1 }) + "K" : String(n);
+const todayStr = () => new Date().toLocaleDateString("en-CA");                 // YYYY-MM-DD, the player's own day
+const dayNum = s => Math.round(Date.UTC(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10)) / 864e5);
+const daysSince = s => s ? dayNum(todayStr()) - dayNum(s) : 0;
+const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+// ---------------------------------------------------------------- state (one document per player)
+const fresh = () => ({ clicks: 0, points: 0, day: "", streak: 0, bestCps: 0, coins: 0, owned: ["classic"], equipped: "classic", dotBest: 0, dotGames: 0, zKills: 0, zBestWave: 0, zBosses: 0 });
+let me = fresh(), myId = null, db = null, userCap = null, canSave = false, saving = false, dirty = false, saveTimer = null;
+let players = [];   // leaderboard rows from the store
+
+// what the leaderboard shows: points, minus 10% for each whole day skipped
+function effective(p) { const missed = daysSince(p.day) - 1; return missed > 0 ? p.points * Math.pow(DECAY, missed) : p.points; }
+
+// the first click of a new day: settle skipped days and the streak
+function newDayCheck() {
+  const t = todayStr();
+  if (me.day === t) return;
+  const gap = me.day ? daysSince(me.day) : 0;
+  if (gap > 1) me.points = Math.floor(me.points * Math.pow(DECAY, gap - 1));
+  me.streak = gap === 1 ? me.streak + 1 : 1;
+  me.day = t;
+  checkAchievements();
+}
+
+function local(load) {
+  try {
+    if (load) { const s = JSON.parse(localStorage.getItem("click-me-online")); if (s) me = Object.assign(fresh(), s); }
+    else localStorage.setItem("click-me-online", JSON.stringify(me));
+  } catch (e) {}
+}
+
+function scheduleSave(soon) {
+  dirty = true;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(save, soon ? 150 : 1500);   // one write per pause in clicking
+}
+async function save() {
+  local(false);
+  if (!canSave || !db || !myId || saving || !dirty) return;
+  saving = true; dirty = false;
+  try {
+    const r = await fetch(API + "/score", { method: "POST", headers: { "Content-Type": "application/json" },
+                                            body: JSON.stringify({ id: myId, name: myName, stats: me }) });
+    if (r.status === 429) dirty = true;
+    else if (r.ok) refreshBoard();
+  } catch (e) { dirty = true; }
+  saving = false;
+  if (dirty) scheduleSave(false);
+}
+addEventListener("pagehide", () => { local(false); });
+document.addEventListener("visibilitychange", () => { if (document.hidden) { clearTimeout(saveTimer); save(); } });
+
+// ---------------------------------------------------------------- achievements
+const CLICK_GOALS = [500, 1000, 2500, 5000, 10000, 25000, 50000, 100000, 250000, 500000, 1e6, 2.5e6, 5e6, 1e7, 2e7];
+const ACHIEVEMENTS = [
+  ...CLICK_GOALS.map(n => ({ id: "c" + n, name: fmt(n) + " clicks", desc: n === GOAL ? "The 20 million finish line" : "Click " + fmt(n) + " times", test: () => me.clicks >= n })),
+  { id: "s3", name: "3-day streak", desc: "Play 3 days in a row", test: () => me.streak >= 3 },
+  { id: "s7", name: "7-day streak", desc: "Play a whole week in a row", test: () => me.streak >= 7 },
+  { id: "s30", name: "30-day streak", desc: "Play 30 days in a row", test: () => me.streak >= 30 },
+  { id: "f10", name: "Quick fingers", desc: "Reach 10 CPS", test: () => me.bestCps >= 10 },
+  { id: "f15", name: "Speed demon", desc: "Reach 15 CPS", test: () => me.bestCps >= 15 },
+  { id: "f20", name: "Lightning hands", desc: "Reach 20 CPS", test: () => me.bestCps >= 20 },
+  { id: "shop", name: "New look", desc: "Buy your first animation", test: () => me.owned.length > 1 },
+  { id: "d10", name: "Dot hunter", desc: "Red Dot streak of 10", test: () => me.dotBest >= 10 },
+  { id: "d25", name: "Dot sniper", desc: "Red Dot streak of 25", test: () => me.dotBest >= 25 },
+  { id: "d50", name: "Dot legend", desc: "Red Dot streak of 50", test: () => me.dotBest >= 50 },
+  { id: "z100", name: "Zombie slayer", desc: "100 zombie kills", test: () => me.zKills >= 100 },
+  { id: "z1000", name: "Horde breaker", desc: "1,000 zombie kills", test: () => me.zKills >= 1000 },
+  { id: "zw10", name: "Survivor", desc: "Reach wave 10", test: () => me.zBestWave >= 10 },
+  { id: "zboss", name: "Boss down", desc: "Beat a Boss Zombie", test: () => me.zBosses >= 1 },
+];
+let unlocked = new Set();
+function checkAchievements(quiet) {
+  for (const a of ACHIEVEMENTS) if (!unlocked.has(a.id) && a.test()) { unlocked.add(a.id); if (!quiet) toast("Achievement: " + a.name + "!"); }
+  if (!$("pane-ach").hidden) renderAch();
+}
+function renderAch() {
+  $("achCount").textContent = `${unlocked.size} of ${ACHIEVEMENTS.length} unlocked`;
+  const box = $("ach"); box.textContent = "";
+  for (const a of ACHIEVEMENTS) {
+    const d = document.createElement("div"); d.className = "badge" + (unlocked.has(a.id) ? " on" : "");
+    const b = document.createElement("b"); b.textContent = (unlocked.has(a.id) ? "★ " : "☆ ") + a.name;
+    const s = document.createElement("span"); s.textContent = a.desc;
+    d.append(b, s); box.append(d);
+  }
+}
+let toastTimer = null;
+function toast(text) {
+  document.querySelectorAll(".toast").forEach(t => t.remove());
+  const t = document.createElement("div"); t.className = "toast"; t.textContent = text; document.body.append(t);
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.remove(), 2600);
+}
+
+// ---------------------------------------------------------------- click animations (shop items)
+const fx = $("fx"), g = fx.getContext("2d");
+let parts = [], dpr = 1;
+function sizeFx() { dpr = Math.min(2, devicePixelRatio || 1); fx.width = innerWidth * dpr; fx.height = innerHeight * dpr; }
+addEventListener("resize", sizeFx); sizeFx();
+const rnd = (a, b) => a + Math.random() * (b - a);
+function P(o) { parts.push(Object.assign({ vx: 0, vy: 0, g: 0, life: 40, age: 0, size: 6, rot: 0, vr: 0, shape: "dot", color: "#fff", drag: 1 }, o)); }
+function star(c, x, y, r) { c.beginPath(); for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r * .45 : r; c.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); } c.closePath(); c.fill(); }
+const ANIMS = [
+  { id: "classic", name: "Classic +1", desc: "A +1 floats up", price: 0,
+    run: (x, y) => P({ x: x + rnd(-14, 14), y: y - 16, vy: -1.6, life: 38, shape: "text", text: "+1", size: 24 }) },
+  { id: "sparkles", name: "Sparkles", desc: "Tiny white sparks", price: 500,
+    run: (x, y) => { for (let i = 0; i < 10; i++) { const a = rnd(0, 7), s = rnd(2, 5); P({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rnd(20, 34), size: rnd(2, 4), drag: .93, color: i % 2 ? "#fff" : "#cfe3ff" }); } } },
+  { id: "ripple", name: "Ripples", desc: "Rings spread out", price: 1000,
+    run: (x, y) => { P({ x, y, shape: "ring", life: 34, size: 10, color: "#fff" }); P({ x, y, shape: "ring", life: 44, size: 4, color: "#9ec5ff" }); } },
+  { id: "confetti", name: "Confetti", desc: "Colorful paper pops", price: 2500,
+    run: (x, y) => { const c = ["#ff6b6b", "#ffd43b", "#69db7c", "#4dabf7", "#da77f2", "#ffa94d"]; for (let i = 0; i < 14; i++) P({ x, y, vx: rnd(-5, 5), vy: rnd(-8, -3), g: .32, life: rnd(40, 60), size: rnd(5, 9), shape: "rect", rot: rnd(0, 6), vr: rnd(-.3, .3), color: c[i % c.length] }); } },
+  { id: "fire", name: "Fire", desc: "Flames rise up", price: 5000,
+    run: (x, y) => { for (let i = 0; i < 14; i++) P({ x: x + rnd(-12, 12), y, vx: rnd(-.8, .8), vy: rnd(-4.5, -2), life: rnd(24, 40), size: rnd(6, 12), shape: "flame", drag: .97 }); } },
+  { id: "rainbow", name: "Rainbow", desc: "A ring of every color", price: 10000,
+    run: (x, y) => { for (let i = 0; i < 18; i++) { const a = i / 18 * Math.PI * 2; P({ x, y, vx: Math.cos(a) * 4, vy: Math.sin(a) * 4, drag: .94, life: 40, size: 5, color: `hsl(${i * 20},95%,62%)` }); } } },
+  { id: "stars", name: "Stars", desc: "Gold stars spin out", price: 25000,
+    run: (x, y) => { for (let i = 0; i < 7; i++) { const a = rnd(0, 7), s = rnd(2, 5); P({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 1, g: .08, life: rnd(36, 52), size: rnd(7, 12), shape: "star", rot: rnd(0, 6), vr: rnd(-.2, .2), color: "#ffd43b", drag: .97 }); } } },
+  { id: "coins", name: "Gold coins", desc: "Coins bounce down", price: 50000,
+    run: (x, y) => { for (let i = 0; i < 6; i++) P({ x, y, vx: rnd(-4, 4), vy: rnd(-9, -5), g: .45, life: 60, size: rnd(7, 10), shape: "coin", bounce: true }); } },
+  { id: "lightning", name: "Lightning", desc: "A bolt strikes the box", price: 100000,
+    run: (x, y) => { const pts = [[x + rnd(-60, 60), 0]]; let cx = pts[0][0]; for (let yy = 40; yy < y; yy += 40) { cx += rnd(-30, 30); pts.push([cx, yy]); } pts.push([x, y]);
+                     P({ x, y, shape: "bolt", pts, life: 14 }); for (let i = 0; i < 8; i++) { const a = rnd(0, 7); P({ x, y, vx: Math.cos(a) * 4, vy: Math.sin(a) * 4, life: 18, size: 3, color: "#fff59d", drag: .9 }); } } },
+  { id: "galaxy", name: "Galaxy", desc: "A swirling spiral of stars", price: 250000,
+    run: (x, y) => { for (let i = 0; i < 24; i++) P({ x, y, shape: "orbit", cx: x, cy: y, ang: i / 24 * Math.PI * 2, rad: 4, life: rnd(40, 56), size: rnd(2, 4), color: `hsl(${250 + i * 4},90%,${70 + (i % 3) * 8}%)` }); } },
+];
+function drawPart(c, p, t) {
+  const k = 1 - p.age / p.life;
+  c.globalAlpha = Math.max(0, Math.min(1, k * 1.4));
+  if (p.shape === "text") { c.fillStyle = p.color; c.font = `400 ${p.size}px Bungee, Impact, sans-serif`; c.textAlign = "center"; c.fillText(p.text, p.x, p.y); }
+  else if (p.shape === "ring") { c.strokeStyle = p.color; c.lineWidth = 4 * k; c.beginPath(); c.arc(p.x, p.y, p.size + p.age * 2.6, 0, 7); c.stroke(); }
+  else if (p.shape === "rect") { c.save(); c.translate(p.x, p.y); c.rotate(p.rot); c.fillStyle = p.color; c.fillRect(-p.size / 2, -p.size / 4, p.size, p.size / 2); c.restore(); }
+  else if (p.shape === "star") { c.save(); c.translate(p.x, p.y); c.rotate(p.rot); c.fillStyle = p.color; star(c, 0, 0, p.size); c.restore(); }
+  else if (p.shape === "flame") { const s = p.size * (0.4 + k * .6); const gr = c.createRadialGradient(p.x, p.y, 0, p.x, p.y, s); gr.addColorStop(0, "#fff3bf"); gr.addColorStop(.4, "#ffa94d"); gr.addColorStop(1, "rgba(250,82,82,0)"); c.fillStyle = gr; c.beginPath(); c.arc(p.x, p.y, s, 0, 7); c.fill(); }
+  else if (p.shape === "coin") { c.fillStyle = "#f4c542"; c.strokeStyle = "#b8860b"; c.lineWidth = 2; c.beginPath(); c.ellipse(p.x, p.y, p.size * Math.abs(Math.cos(t / 90 + p.size)), p.size, 0, 0, 7); c.fill(); c.stroke(); }
+  else if (p.shape === "bolt") { c.strokeStyle = "#fff59d"; c.lineWidth = 4; c.shadowColor = "#fff"; c.shadowBlur = 16; c.beginPath(); p.pts.forEach(([a, b], i) => i ? c.lineTo(a, b) : c.moveTo(a, b)); c.stroke(); c.shadowBlur = 0; }
+  else { c.fillStyle = p.color; c.beginPath(); c.arc(p.x, p.y, p.size, 0, 7); c.fill(); }
+  c.globalAlpha = 1;
+}
+function stepPart(p) {
+  p.age++;
+  if (p.shape === "orbit") { p.ang += .12; p.rad += 1.6; p.x = p.cx + Math.cos(p.ang) * p.rad; p.y = p.cy + Math.sin(p.ang) * p.rad * .7; return; }
+  p.vx *= p.drag; p.vy = p.vy * p.drag + p.g; p.x += p.vx; p.y += p.vy; p.rot += p.vr;
+  if (p.bounce && p.y > innerHeight - 10) { p.y = innerHeight - 10; p.vy *= -.55; }
+}
+function loop(t) {
+  g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, innerWidth, innerHeight);
+  parts = parts.filter(p => p.age < p.life);
+  for (const p of parts) { stepPart(p); drawPart(g, p, t); }
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+// ---------------------------------------------------------------- clicking
+const box = $("box");
+let recent = [];
+function cpsNow() { const n = performance.now(); while (recent.length && n - recent[0] > 1000) recent.shift(); return recent.length; }
+setInterval(() => { $("cps").textContent = "CPS: " + cpsNow(); }, 100);
+
+function click(e) {
+  if (e.button !== 0 && e.button !== 2) return;
+  e.preventDefault();
+  if (me.clicks >= GOAL) return;
+  if (cpsNow() >= MAX_CPS) return;                     // faster than a person can click: doesn't count
+  recent.push(performance.now());
+  newDayCheck();
+  me.clicks++; me.points++; me.coins++;
+  const c = cpsNow(); if (c > me.bestCps) me.bestCps = c;
+  box.classList.add("down"); setTimeout(() => box.classList.remove("down"), 70);
+  const anim = ANIMS.find(a => a.id === me.equipped) || ANIMS[0];
+  if (!reduced) { anim.run(e.clientX, e.clientY); if (anim.id !== "classic" && Math.random() < .5) ANIMS[0].run(e.clientX, e.clientY); }
+  if (CLICK_GOALS.includes(me.clicks) || c === 10 || c === 15 || c === 20) checkAchievements();
+  if (me.clicks >= GOAL) showWin();
+  scheduleSave(false); renderStats();
+}
+box.addEventListener("mousedown", click);
+box.addEventListener("keydown", e => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); const r = box.getBoundingClientRect(); click({ button: 0, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2, preventDefault() {} }); } });
+addEventListener("contextmenu", e => { if (e.target === box || box.contains(e.target)) e.preventDefault(); });
+
+function renderStats() {
+  $("total").textContent = fmt(me.clicks);
+  $("fill").style.width = (me.clicks / GOAL * 100) + "%";
+  $("goalText").textContent = `${fmt(me.clicks)} / ${fmt(GOAL)} clicks`;
+  $("bestCps").textContent = "Best CPS: " + me.bestCps;
+  $("coins").textContent = fmt(me.coins) + " coins";
+  const st = me.day && daysSince(me.day) <= 1 ? me.streak : 0;
+  $("streak").textContent = st ? `🔥 ${st}-day streak` : "No streak yet";
+  $("score").textContent = "Score " + fmt(effective(me));
+  if (!$("pane-shop").hidden) renderShopButtons();
+}
+function showWin() {
+  if (document.querySelector(".win")) return;
+  const w = document.createElement("div"); w.className = "win";
+  const h = document.createElement("h2"); h.textContent = "20,000,000 clicks!";
+  const p = document.createElement("p"); p.textContent = "You did it. Best CPS: " + me.bestCps;
+  const b = document.createElement("button"); b.className = "linkbtn"; b.textContent = "Close"; b.onclick = () => w.remove();
+  w.append(h, p, b); document.body.append(w);
+}
+
+// ---------------------------------------------------------------- shop
+function renderShop() {
+  const shop = $("shop"); shop.textContent = "";
+  for (const a of ANIMS) {
+    const it = document.createElement("div"); it.className = "item";
+    const cv = document.createElement("canvas"); cv.width = 88; cv.height = 88; it.append(cv); previewIcon(cv, a);
+    const txt = document.createElement("div"); const h = document.createElement("h4"); h.textContent = a.name;
+    const p = document.createElement("p"); p.textContent = a.desc + (a.price ? " · " + fmt(a.price) + " coins" : " · free");
+    txt.append(h, p); it.append(txt);
+    const b = document.createElement("button"); b.type = "button"; b.dataset.id = a.id; b.onclick = () => shopClick(a); it.append(b);
+    shop.append(it);
+  }
+  renderShopButtons();
+}
+function renderShopButtons() {
+  for (const b of document.querySelectorAll("#shop button")) {
+    const a = ANIMS.find(x => x.id === b.dataset.id), owned = me.owned.includes(a.id);
+    b.disabled = false;
+    if (me.equipped === a.id) { b.className = "using"; b.textContent = "Using"; }
+    else if (owned) { b.className = "use"; b.textContent = "Use"; }
+    else { b.className = "buy"; b.textContent = "Buy " + short(a.price); b.disabled = me.coins < a.price; }
+  }
+}
+function shopClick(a) {
+  if (me.equipped === a.id) return;
+  if (!me.owned.includes(a.id)) {
+    if (me.coins < a.price) return;
+    me.coins -= a.price; me.owned = me.owned.concat(a.id); toast("You bought " + a.name + "!");
+    checkAchievements();
+  }
+  me.equipped = a.id; scheduleSave(true); renderStats(); renderShopButtons();
+  const r = box.getBoundingClientRect(); if (!reduced) a.run(r.left + r.width / 2, r.top + r.height / 2);
+}
+function previewIcon(cv, a) {   // a still picture of each animation for the shop list
+  const c = cv.getContext("2d"); c.scale(2, 2); const save = parts; parts = [];
+  a.run(22, 26); for (let i = 0; i < (a.id === "classic" ? 4 : 9); i++) parts.forEach(stepPart);
+  if (a.id === "lightning") parts.forEach(p => { if (p.shape === "bolt") p.pts = [[30, 0], [16, 12], [26, 16], [14, 30]]; });
+  for (const p of parts) { if (p.shape === "text") p.size = 16; drawPart(c, p, 500); }
+  parts = save;
+}
+
+// ---------------------------------------------------------------- leaderboard
+let boardBusy = false, boardAgain = false;
+const extraBoards = {
+  dot: { list: "dotBoard", note: "dotBoardNote", value: p => p.dotBest || 0, sub: p => fmt(p.dotGames || 0) + " games played", empty: "No streaks yet. Play a round to be first!" },
+  zombie: { list: "zBoard", note: "zBoardNote", value: p => p.zKills || 0, sub: p => "Best wave " + (p.zBestWave || 0), empty: "No kills yet. Survive a wave to be first!" },
+};
+const extraBusy = {}, extraAgain = {};
+async function renderExtraBoard(key) {
+  if (extraBusy[key]) { extraAgain[key] = true; return; }
+  extraBusy[key] = true;
+  const cfg = extraBoards[key], note = $(cfg.note), list = $(cfg.list);
+  if (!db) { note.textContent = "The leaderboard can't be reached right now. Your progress is saved on this device."; list.textContent = ""; extraBusy[key] = false; return; }
+  const rows = players.filter(p => cfg.value(p) > 0).sort((a, b) => cfg.value(b) - cfg.value(a)).slice(0, 25);
+  const profiles = {};
+  list.textContent = "";
+  rows.forEach((r, i) => {
+    const pr = profiles[r.id] || {};
+    const li = document.createElement("li"); li.className = "row" + (r.me ? " me" : "");
+    const rank = document.createElement("span"); rank.className = "rank"; rank.textContent = i + 1;
+    const img = document.createElement("img"); img.alt = ""; img.src = avatarFor(r.name || "?");
+    const who = document.createElement("div"); who.className = "who";
+    const nm = document.createElement("div"); nm.textContent = (r.name || "Player") + (r.me ? " (you)" : "");
+    const sm = document.createElement("small"); sm.textContent = cfg.sub(r);
+    who.append(nm, sm);
+    const pts = document.createElement("span"); pts.className = "pts"; pts.textContent = fmt(cfg.value(r));
+    li.append(rank, img, who, pts); list.append(li);
+  });
+  note.textContent = !rows.length ? cfg.empty : myName ? "" : "Type your name above to show up on the boards.";
+  extraBusy[key] = false;
+  if (extraAgain[key]) { extraAgain[key] = false; renderExtraBoard(key); }
+}
+function renderAllBoards() { renderBoard(); renderExtraBoard("dot"); renderExtraBoard("zombie"); }
+async function renderBoard() {
+  if (boardBusy) { boardAgain = true; return; }
+  boardBusy = true;
+  const note = $("boardNote"), list = $("board");
+  if (!db) {
+    note.textContent = "The leaderboard can't be reached right now. Your progress is saved on this device.";
+    list.textContent = ""; boardBusy = false; return;
+  }
+  const rows = players.map(p => ({ id: p.id, name: p.name, me: p.me, pts: effective(p), streak: daysSince(p.day) <= 1 ? (p.streak || 0) : 0, missed: Math.max(0, daysSince(p.day) - 1), clicks: p.clicks || 0 }))
+    .sort((a, b) => b.pts - a.pts).slice(0, 25);
+  const profiles = {};
+  list.textContent = "";
+  rows.forEach((r, i) => {
+    const pr = profiles[r.id] || {};
+    const li = document.createElement("li"); li.className = "row" + (r.me ? " me" : "");
+    const rank = document.createElement("span"); rank.className = "rank"; rank.textContent = i + 1;
+    const img = document.createElement("img"); img.alt = ""; img.src = avatarFor(r.name || "?");
+    const who = document.createElement("div"); who.className = "who";
+    const nm = document.createElement("div"); nm.textContent = (r.name || "Player") + (r.me ? " (you)" : "");
+    const sm = document.createElement("small");
+    if (r.missed > 0) { sm.className = "warn"; sm.textContent = `Skipped ${r.missed} day${r.missed > 1 ? "s" : ""} · -${Math.round((1 - Math.pow(DECAY, r.missed)) * 100)}%`; }
+    else sm.textContent = r.streak ? `🔥 ${r.streak}-day streak` : fmt(r.clicks) + " clicks";
+    who.append(nm, sm);
+    const pts = document.createElement("span"); pts.className = "pts"; pts.textContent = fmt(r.pts);
+    li.append(rank, img, who, pts); list.append(li);
+  });
+  note.textContent = !rows.length ? "No one is on the leaderboard yet. Click the box to be first!"
+    : myName ? "" : "Type your name above to show up on the boards.";
+  boardBusy = false;
+  if (boardAgain) { boardAgain = false; renderBoard(); }
+}
+
+// ---------------------------------------------------------------- tabs
+const TABS = ["board", "shop", "ach"];
+function showTab(name) {
+  for (const t of TABS) { $("tab-" + t).setAttribute("aria-selected", String(t === name)); $("pane-" + t).hidden = t !== name; }
+  if (name === "shop") renderShop();
+  if (name === "ach") renderAch();
+  try { localStorage.setItem("click-me-tab", name); } catch (e) {}
+}
+TABS.forEach(t => $("tab-" + t).onclick = () => showTab(t));
+
+// start over (confirm inside the page)
+function renderResetArea(confirming) {
+  const area = $("resetArea"); area.textContent = "";
+  if (!confirming) {
+    const b = document.createElement("button"); b.className = "linkbtn"; b.type = "button"; b.textContent = "Start over";
+    b.onclick = () => renderResetArea(true); area.append(b); return;
+  }
+  const q = document.createElement("p"); q.className = "note"; q.textContent = "Start over? Your clicks, coins, animations, streaks, Red Dot best and zombie kills go back to zero.";
+  const row = document.createElement("div"); row.className = "confirm";
+  const yes = document.createElement("button"); yes.type = "button"; yes.textContent = "Yes, start over"; yes.style.background = "var(--warn)";
+  const no = document.createElement("button"); no.type = "button"; no.textContent = "Keep my progress";
+  yes.onclick = () => { me = fresh(); unlocked = new Set(); scheduleSave(true); renderStats(); renderAch(); renderDotStats(); renderZMine(); renderResetArea(false); toast("Started over"); };
+  no.onclick = () => renderResetArea(false);
+  row.append(yes, no); area.append(q, row);
+}
+renderResetArea(false);
+
+// ---------------------------------------------------------------- screens (title / Click Me / Red Dot / Zombie Waves)
+let screen = "title", pickIdx = 0;
+const PICKS = ["clicker", "dot", "zombie"];
+function go(name) {
+  if (screen === "dot" && name !== "dot") dotQuit();
+  if (screen === "zombie" && name !== "zombie") zPause();
+  screen = name;
+  for (const n of ["title", "clicker", "dot", "zombie"]) $("screen-" + n).hidden = n !== name;
+  if (name === "clicker") box.focus({ preventScroll: true });
+  if (name === "title") $("pick-" + PICKS[pickIdx]).focus({ preventScroll: true });
+  if (name === "zombie") { zResize(); zDraw(); }
+}
+function setPick(i) {
+  pickIdx = (i + PICKS.length) % PICKS.length;
+  PICKS.forEach((p, k) => $("pick-" + p).setAttribute("aria-selected", String(k === pickIdx)));
+  $("pick-" + PICKS[pickIdx]).focus({ preventScroll: true });
+}
+PICKS.forEach((p, k) => $("pick-" + p).onclick = () => { pickIdx = k; go(p); });
+document.querySelectorAll("[data-back]").forEach(b => b.onclick = () => go("title"));
+addEventListener("keydown", e => {
+  if (e.key === "Escape" && screen !== "title") { e.preventDefault(); go("title"); return; }
+  if (screen !== "title") return;
+  if (e.key === "ArrowRight" || e.key === "ArrowDown") { e.preventDefault(); setPick(pickIdx + 1); }
+  if (e.key === "ArrowLeft" || e.key === "ArrowUp") { e.preventDefault(); setPick(pickIdx - 1); }
+  if (e.key === "Enter") { e.preventDefault(); go(PICKS[pickIdx]); }
+});
+
+// ---------------------------------------------------------------- Red Dot
+const dot = $("dot"), dotfield = $("dotfield");
+let dotRun = 0, dotTimer = null, dotDeadline = 0, dotAlive = false, dotRaf = 0;
+const dotSize = n => Math.max(22, 72 - n * 1.6);    // gets smaller...
+const dotTime = n => Math.max(450, 1700 - n * 38);   // ...and faster as the streak grows
+function renderDotStats() { $("dotStreak").textContent = dotRun; $("dotBest").textContent = "Best streak: " + (me.dotBest || 0); }
+function placeDot() {
+  const size = dotSize(dotRun), r = dotfield.getBoundingClientRect(), pad = size / 2 + 12, top = 96;
+  const x = pad + Math.random() * Math.max(1, r.width - pad * 2);
+  const y = top + pad + Math.random() * Math.max(1, r.height - top - pad * 2);
+  dot.style.width = dot.style.height = size + "px"; dot.style.left = x + "px"; dot.style.top = y + "px"; dot.hidden = false;
+  const ms = dotTime(dotRun); dotDeadline = performance.now() + ms;
+  clearTimeout(dotTimer); dotTimer = setTimeout(() => dotOver("Too slow!"), ms);
+  cancelAnimationFrame(dotRaf);
+  const ring = $("dotRing");
+  const tick = () => {
+    ring.setAttribute("stroke-dasharray", (Math.max(0, dotDeadline - performance.now()) / ms * 100) + " 100");
+    if (dotAlive) dotRaf = requestAnimationFrame(tick);
+  };
+  tick();
+}
+function dotStart() { dotRun = 0; dotAlive = true; $("dotCard").hidden = true; renderDotStats(); placeDot(); }
+function dotHalt() { dotAlive = false; clearTimeout(dotTimer); cancelAnimationFrame(dotRaf); dot.hidden = true; }
+function dotQuit() { if (dotAlive) dotOver("Run ended"); }
+function dotOver(why) {
+  if (!dotAlive) return;
+  dotHalt();
+  me.dotGames = (me.dotGames || 0) + 1;
+  const isBest = dotRun > (me.dotBest || 0);
+  if (isBest) me.dotBest = dotRun;
+  checkAchievements(); scheduleSave(true); renderDotStats(); renderStats();
+  $("dotTitle").textContent = why;
+  const t = $("dotText"); t.textContent = "";
+  const a = document.createElement("span"); a.textContent = "Streak: ";
+  const b = document.createElement("b"); b.textContent = dotRun;
+  const c = document.createElement("span"); c.textContent = isBest && dotRun > 0 ? " · New best streak!" : " · Best: " + (me.dotBest || 0);
+  t.append(a, b, c);
+  $("dotGo").textContent = "PLAY AGAIN"; $("dotCard").hidden = false;
+  if (screen === "dot") $("dotGo").focus({ preventScroll: true });
+}
+dot.addEventListener("mousedown", e => {
+  if (e.button !== 0 && e.button !== 2) return;
+  e.preventDefault(); e.stopPropagation();
+  if (!dotAlive) return;
+  dotRun++; me.coins += 2;
+  const anim = ANIMS.find(a => a.id === me.equipped) || ANIMS[0];
+  if (!reduced) anim.run(e.clientX, e.clientY);
+  renderDotStats(); placeDot();
+});
+dot.addEventListener("contextmenu", e => e.preventDefault());
+dotfield.addEventListener("mousedown", e => {
+  if (dotAlive && !$("dotCard").contains(e.target) && e.target !== dot && !dot.contains(e.target)) dotOver("Missed!");
+});
+dotfield.addEventListener("contextmenu", e => e.preventDefault());
+$("dotGo").onclick = dotStart;
+
+// ---------------------------------------------------------------- Zombie Waves (a Brotato-style survival game)
+const zc = $("zcanvas"), zg = zc.getContext("2d"), zfield = $("zfield");
+const WORLD = 2400;                        // the map is much bigger than the screen; the camera follows you
+let zW = 600, zH = 400, zdpr = 1, Z = null, zLast = 0, zAcc = 0, zLoopOn = false;
+const zKeys = {};
+let zTouch = null;                         // where a finger is held (screen coords inside the field)
+const PROPS = [];                          // gravestones and bushes, same every game
+(function () { let seed = 7; const r = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < 160; i++) PROPS.push({ x: r() * WORLD, y: r() * WORLD, kind: r() < .45 ? "grave" : "bush", s: 10 + r() * 14 }); })();
+
+function zResize() {
+  const r = zfield.getBoundingClientRect();
+  zdpr = Math.min(2, devicePixelRatio || 1); zW = Math.max(200, r.width); zH = Math.max(200, r.height);
+  zc.width = zW * zdpr; zc.height = zH * zdpr;
+}
+addEventListener("resize", () => { if (screen === "zombie") { zResize(); zDraw(); } });
+
+function renderZMine() { $("zMine").textContent = `Your kills ever: ${fmt(me.zKills || 0)} · Best wave: ${me.zBestWave || 0}`; }
+
+const UPGRADES = [
+  { n: "Sharper bullets", d: "+25% damage", f: () => { Z.dmg *= 1.25; } },
+  { n: "Faster trigger", d: "+20% fire rate", f: () => { Z.fireDelay = Math.max(5, Z.fireDelay / 1.2); } },
+  { n: "Running shoes", d: "+12% move speed", f: () => { Z.speed *= 1.12; } },
+  { n: "Thick skin", d: "+25 max health", f: () => { Z.maxHp += 25; Z.hp += 25; } },
+  { n: "Double shot", d: "+1 bullet each shot", f: () => { Z.bullets = Math.min(7, Z.bullets + 1); } },
+  { n: "Long gun", d: "+20% range", f: () => { Z.range *= 1.2; } },
+  { n: "First aid", d: "Heal to full health", f: () => { Z.hp = Z.maxHp; } },
+];
+
+function zNewRun() {
+  Z = { px: WORLD / 2, py: WORLD / 2, hp: 100, maxHp: 100, speed: 3.2, dmg: 10, fireDelay: 24, range: 430, bullets: 1,
+        fireCd: 0, inv: 0, wave: 0, kills: 0, zombies: [], shots: [], warns: [], splats: [], running: false, waveFrames: 0,
+        spawnCd: 0, phase: "ready", t: 0 };
+}
+function zStartWave() {
+  Z.wave++; Z.waveFrames = Math.min(60, 22 + Z.wave * 3) * 60; Z.spawnCd = 40;
+  Z.zombies = []; Z.shots = []; Z.warns = [];
+  if (Z.wave % 5 === 0) zSpawnBoss();
+  Z.phase = "fight"; Z.running = true; $("zCard").hidden = true; zKick();
+}
+function zSpawnSpot(minDist) {
+  for (let i = 0; i < 30; i++) {
+    const x = 60 + Math.random() * (WORLD - 120), y = 60 + Math.random() * (WORLD - 120);
+    if (Math.hypot(x - Z.px, y - Z.py) > minDist) return { x, y };
+  }
+  return { x: Z.px > WORLD / 2 ? 80 : WORLD - 80, y: Z.py > WORLD / 2 ? 80 : WORLD - 80 };
+}
+function zSpawnBoss() {
+  const s = zSpawnSpot(600), hp = 450 + Z.wave * 160;
+  Z.zombies.push({ x: s.x, y: s.y, r: 42, hp, maxHp: hp, speed: 0.95 + Z.wave * 0.02, dmg: 25, boss: true, flash: 0 });
+}
+function zMakeZombie(x, y) {
+  const hp = 18 + Z.wave * 7;
+  Z.zombies.push({ x, y, r: 16, hp, maxHp: hp, speed: Math.min(2.7, 1.15 + Z.wave * 0.07) * (0.85 + Math.random() * 0.3), dmg: 8 + Z.wave, boss: false, flash: 0 });
+}
+
+function zStep() {
+  Z.t++;
+  // move
+  let mx = 0, my = 0;
+  if (zKeys.left) mx--; if (zKeys.right) mx++; if (zKeys.up) my--; if (zKeys.down) my++;
+  if (zTouch) { const dx = zTouch.x - zW / 2, dy = zTouch.y - zH / 2, d = Math.hypot(dx, dy); if (d > 12) { mx = dx / d; my = dy / d; } }
+  const ml = Math.hypot(mx, my);
+  if (ml > 0) { Z.px += mx / ml * Z.speed; Z.py += my / ml * Z.speed; }
+  Z.px = Math.max(20, Math.min(WORLD - 20, Z.px)); Z.py = Math.max(20, Math.min(WORLD - 20, Z.py));
+  if (Z.inv > 0) Z.inv--;
+
+  // shoot the nearest zombie in range (auto-aim)
+  if (--Z.fireCd <= 0) {
+    let best = null, bd = Z.range;
+    for (const z of Z.zombies) { const d = Math.hypot(z.x - Z.px, z.y - Z.py) - z.r; if (d < bd) { bd = d; best = z; } }
+    if (best) {
+      const base = Math.atan2(best.y - Z.py, best.x - Z.px);
+      for (let i = 0; i < Z.bullets; i++) {
+        const a = base + (i - (Z.bullets - 1) / 2) * 0.12;
+        Z.shots.push({ x: Z.px, y: Z.py, vx: Math.cos(a) * 11, vy: Math.sin(a) * 11, life: Z.range / 11 + 4 });
+      }
+      Z.fireCd = Z.fireDelay;
+    }
+  }
+  // bullets
+  for (const b of Z.shots) {
+    b.x += b.vx; b.y += b.vy; b.life--;
+    for (const z of Z.zombies) {
+      if (z.hp > 0 && Math.hypot(z.x - b.x, z.y - b.y) < z.r + 4) {
+        z.hp -= Z.dmg; z.flash = 5; b.life = 0;
+        z.x += b.vx * (z.boss ? 0.05 : 0.35); z.y += b.vy * (z.boss ? 0.05 : 0.35);   // a little knockback
+        if (z.hp <= 0) zKill(z);
+        break;
+      }
+    }
+  }
+  Z.shots = Z.shots.filter(b => b.life > 0);
+  Z.zombies = Z.zombies.filter(z => z.hp > 0);
+
+  // zombies chase you, and push apart a little
+  for (const z of Z.zombies) {
+    const dx = Z.px - z.x, dy = Z.py - z.y, d = Math.hypot(dx, dy) || 1;
+    z.x += dx / d * z.speed; z.y += dy / d * z.speed;
+    if (z.flash > 0) z.flash--;
+    if (d < z.r + 14 && Z.inv <= 0) { Z.hp -= z.dmg; Z.inv = 40; }
+  }
+  for (let i = 0; i < Z.zombies.length; i++) for (let j = i + 1; j < Z.zombies.length; j++) {
+    const a = Z.zombies[i], b = Z.zombies[j], dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy), min = a.r + b.r;
+    if (d > 0 && d < min) { const push = (min - d) / 2, ux = dx / d, uy = dy / d; if (!a.boss) { a.x -= ux * push; a.y -= uy * push; } if (!b.boss) { b.x += ux * push; b.y += uy * push; } }
+  }
+
+  // spawning: a red X warns where a zombie will come up
+  for (const w of Z.warns) if (--w.t <= 0) zMakeZombie(w.x, w.y);
+  Z.warns = Z.warns.filter(w => w.t > 0);
+  if (Z.waveFrames > 0 && --Z.spawnCd <= 0) {
+    const cap = 30 + Z.wave * 8, count = 1 + Math.floor(Z.wave / 3);
+    for (let i = 0; i < count && Z.zombies.length + Z.warns.length < cap; i++) { const s = zSpawnSpot(380); Z.warns.push({ x: s.x, y: s.y, t: 50 }); }
+    Z.spawnCd = Math.max(12, 70 - Z.wave * 5);
+  }
+  for (const s of Z.splats) s.t--;
+  Z.splats = Z.splats.filter(s => s.t > 0);
+
+  // wave timer: the wave ends when time is up (a boss must be beaten first)
+  if (Z.waveFrames > 0) Z.waveFrames--;
+  const bossAlive = Z.zombies.some(z => z.boss);
+  if (Z.waveFrames <= 0 && !bossAlive) zWaveDone();
+  if (Z.hp <= 0) zDead();
+}
+function zKill(z) {
+  Z.kills++; me.zKills = (me.zKills || 0) + 1; me.coins++;
+  Z.splats.push({ x: z.x, y: z.y, r: z.r, t: 240 });
+  if (z.boss) { me.zBosses = (me.zBosses || 0) + 1; toast("You beat the Boss Zombie!"); }
+  if (me.zKills === 100 || me.zKills === 1000 || z.boss) checkAchievements();
+  scheduleSave(false);
+}
+function zWaveDone() {
+  Z.running = false; Z.phase = "upgrade"; Z.zombies = []; Z.warns = []; Z.shots = [];
+  Z.hp = Math.min(Z.maxHp, Z.hp + Math.round(Z.maxHp * 0.15));
+  if (Z.wave > (me.zBestWave || 0)) me.zBestWave = Z.wave;
+  checkAchievements(); scheduleSave(true); renderZMine(); renderStats();
+  $("zTitle").textContent = "WAVE " + Z.wave + " CLEARED";
+  const t = $("zText"); t.textContent = "";
+  const a = document.createElement("span"); a.textContent = "Pick an upgrade for wave " + (Z.wave + 1) + ". Kills this run: ";
+  const b = document.createElement("b"); b.textContent = Z.kills;
+  t.append(a, b);
+  const ups = $("zUps"); ups.textContent = "";
+  const pool = UPGRADES.slice().sort(() => Math.random() - .5).slice(0, 3);
+  pool.forEach((u, i) => {
+    const btn = document.createElement("button"); btn.type = "button"; btn.className = "up";
+    const k = document.createElement("kbd"); k.textContent = "Press " + (i + 1);
+    const n = document.createElement("b"); n.textContent = u.n;
+    const d = document.createElement("span"); d.textContent = u.d;
+    btn.append(k, n, d);
+    btn.onclick = () => { u.f(); ups.textContent = ""; zStartWave(); };
+    ups.append(btn);
+  });
+  $("zGo").hidden = true; $("zCard").hidden = false; zHud(); zDraw();
+}
+function zDead() {
+  Z.running = false; Z.phase = "dead";
+  if (Z.wave > (me.zBestWave || 0)) me.zBestWave = Z.wave;
+  checkAchievements(); scheduleSave(true); renderZMine(); renderStats();
+  $("zTitle").textContent = "THE ZOMBIES GOT YOU";
+  const t = $("zText"); t.textContent = "";
+  const parts = [["You reached ", "wave " + Z.wave], [" with ", Z.kills + " kills"], [". All-time kills: ", fmt(me.zKills)]];
+  for (const [plain, bold] of parts) { const a = document.createElement("span"); a.textContent = plain; const b = document.createElement("b"); b.textContent = bold; t.append(a, b); }
+  $("zUps").textContent = ""; $("zGo").textContent = "PLAY AGAIN"; $("zGo").hidden = false; $("zCard").hidden = false;
+  zHud(); zDraw();
+}
+function zPause() {
+  if (!Z || !Z.running) return;
+  Z.running = false; Z.phase = "paused";
+  $("zTitle").textContent = "PAUSED";
+  $("zText").textContent = "Wave " + Z.wave + " · " + Z.kills + " kills so far.";
+  $("zUps").textContent = ""; $("zGo").textContent = "RESUME"; $("zGo").hidden = false; $("zCard").hidden = false;
+}
+$("zGo").onclick = () => {
+  if (Z && Z.phase === "paused") { Z.phase = "fight"; Z.running = true; $("zCard").hidden = true; zKick(); return; }
+  zNewRun(); zResize(); zStartWave();
+};
+function zHud() {
+  if (!Z) return;
+  const boss = Z.zombies.find(z => z.boss);
+  $("zWave").textContent = (Z.wave % 5 === 0 ? "BOSS WAVE " : "WAVE ") + Z.wave;
+  const secs = Math.ceil(Z.waveFrames / 60);
+  $("zInfo").textContent = (Z.waveFrames <= 0 && boss ? "Beat the boss!" : `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")} left`) + ` · ${Z.kills} kills`;
+  $("zHp").style.width = Math.max(0, Z.hp / Z.maxHp * 100) + "%";
+  $("zHp").style.background = Z.hp / Z.maxHp < .3 ? "var(--red)" : "var(--good)";
+  $("zHpText").textContent = `${Math.max(0, Math.ceil(Z.hp))} / ${Z.maxHp}`;
+}
+function zDraw() {
+  const c = zg; c.setTransform(zdpr, 0, 0, zdpr, 0, 0);
+  const px = Z ? Z.px : WORLD / 2, py = Z ? Z.py : WORLD / 2;
+  const camX = px - zW / 2, camY = py - zH / 2;
+  c.fillStyle = "#14220f"; c.fillRect(0, 0, zW, zH);                                  // outside the map
+  c.fillStyle = "#2c4a26"; c.fillRect(-camX, -camY, WORLD, WORLD);                    // the map
+  c.strokeStyle = "rgba(255,255,255,.05)"; c.lineWidth = 1; c.beginPath();
+  for (let x = Math.ceil(camX / 80) * 80; x < camX + zW; x += 80) if (x >= 0 && x <= WORLD) { c.moveTo(x - camX, Math.max(0, -camY)); c.lineTo(x - camX, Math.min(zH, WORLD - camY)); }
+  for (let y = Math.ceil(camY / 80) * 80; y < camY + zH; y += 80) if (y >= 0 && y <= WORLD) { c.moveTo(Math.max(0, -camX), y - camY); c.lineTo(Math.min(zW, WORLD - camX), y - camY); }
+  c.stroke();
+  c.strokeStyle = "#8a5a2b"; c.lineWidth = 6; c.strokeRect(-camX, -camY, WORLD, WORLD);  // fence around the map
+  for (const p of PROPS) {
+    const x = p.x - camX, y = p.y - camY; if (x < -40 || y < -40 || x > zW + 40 || y > zH + 40) continue;
+    if (p.kind === "grave") { c.fillStyle = "#7d8691"; c.beginPath(); c.roundRect ? c.roundRect(x - p.s / 2, y - p.s, p.s, p.s * 1.3, [p.s / 2, p.s / 2, 2, 2]) : c.rect(x - p.s / 2, y - p.s, p.s, p.s * 1.3); c.fill(); c.fillStyle = "#5c6570"; c.fillRect(x - 1, y - p.s * .7, 2, p.s * .5); c.fillRect(x - p.s * .2, y - p.s * .55, p.s * .4, 2); }
+    else { c.fillStyle = "#3b6b30"; c.beginPath(); c.arc(x, y, p.s, 0, 7); c.arc(x + p.s * .7, y + 2, p.s * .7, 0, 7); c.fill(); }
+  }
+  if (!Z) return;
+  for (const s of Z.splats) { c.globalAlpha = Math.min(1, s.t / 120) * .6; c.fillStyle = "#4d7a2a"; c.beginPath(); c.arc(s.x - camX, s.y - camY, s.r * .9, 0, 7); c.fill(); }
+  c.globalAlpha = 1;
+  for (const w of Z.warns) {
+    const x = w.x - camX, y = w.y - camY, s = 9; c.strokeStyle = (w.t >> 3) % 2 ? "#fa5252" : "#ffa8a8"; c.lineWidth = 4;
+    c.beginPath(); c.moveTo(x - s, y - s); c.lineTo(x + s, y + s); c.moveTo(x + s, y - s); c.lineTo(x - s, y + s); c.stroke();
+  }
+  for (const b of Z.shots) { c.fillStyle = "#ffd43b"; c.beginPath(); c.arc(b.x - camX, b.y - camY, 4, 0, 7); c.fill(); }
+  for (const z of Z.zombies) {
+    const x = z.x - camX, y = z.y - camY; if (x < -60 || y < -60 || x > zW + 60 || y > zH + 60) continue;
+    const a = Math.atan2(Z.py - z.y, Z.px - z.x), body = z.flash ? "#ffffff" : z.boss ? "#3f7a34" : "#69a85a";
+    c.fillStyle = z.boss ? "#2f5c27" : "#4f8a43";                                    // arms reaching for you
+    for (const side of [-1, 1]) { const ax = x + Math.cos(a + side * .5) * z.r * 1.05, ay = y + Math.sin(a + side * .5) * z.r * 1.05; c.beginPath(); c.arc(ax, ay, z.r * .32, 0, 7); c.fill(); }
+    c.fillStyle = body; c.strokeStyle = z.boss ? "#1e3a19" : "#3d6b33"; c.lineWidth = 3; c.beginPath(); c.arc(x, y, z.r, 0, 7); c.fill(); c.stroke();
+    c.fillStyle = z.boss ? "#ff2020" : "#1b1b1b";
+    for (const side of [-1, 1]) { const ex = x + Math.cos(a + side * .55) * z.r * .5, ey = y + Math.sin(a + side * .55) * z.r * .5; c.beginPath(); c.arc(ex, ey, z.r * .14, 0, 7); c.fill(); }
+    if (z.boss) {
+      c.fillStyle = "rgba(0,0,0,.55)"; c.fillRect(x - 46, y - z.r - 18, 92, 8);
+      c.fillStyle = "#fa5252"; c.fillRect(x - 46, y - z.r - 18, 92 * Math.max(0, z.hp / z.maxHp), 8);
+      c.fillStyle = "#fff"; c.font = "400 12px Bungee, Impact, sans-serif"; c.textAlign = "center"; c.fillText("BOSS", x, y - z.r - 24);
+    }
+  }
+  // arrow toward an off-screen boss
+  const boss = Z.zombies.find(z => z.boss);
+  if (boss) {
+    const x = boss.x - camX, y = boss.y - camY;
+    if (x < 0 || y < 0 || x > zW || y > zH) {
+      const a = Math.atan2(y - zH / 2, x - zW / 2), ex = zW / 2 + Math.cos(a) * (Math.min(zW, zH) / 2 - 30), ey = zH / 2 + Math.sin(a) * (Math.min(zW, zH) / 2 - 30);
+      c.save(); c.translate(ex, ey); c.rotate(a); c.fillStyle = "#fa5252"; c.beginPath(); c.moveTo(14, 0); c.lineTo(-8, -10); c.lineTo(-8, 10); c.closePath(); c.fill(); c.restore();
+    }
+  }
+  // you
+  if (!(Z.inv > 0 && (Z.inv >> 2) % 2)) {
+    c.fillStyle = "#4dabf7"; c.strokeStyle = "#fff"; c.lineWidth = 3; c.beginPath(); c.arc(zW / 2, zH / 2, 14, 0, 7); c.fill(); c.stroke();
+  }
+  c.strokeStyle = "rgba(255,255,255,.08)"; c.lineWidth = 1; c.beginPath(); c.arc(zW / 2, zH / 2, Z.range, 0, 7); c.stroke();   // your range
+}
+function zKick() { if (!zLoopOn) { zLoopOn = true; zLast = performance.now(); zAcc = 0; requestAnimationFrame(zLoop); } }
+function zLoop(now) {
+  if (!Z || !Z.running || screen !== "zombie") { zLoopOn = false; return; }
+  zAcc += Math.min(200, now - zLast); zLast = now;
+  while (zAcc >= 1000 / 60 && Z.running) { zStep(); zAcc -= 1000 / 60; }
+  zHud(); zDraw();
+  requestAnimationFrame(zLoop);
+}
+document.addEventListener("visibilitychange", () => { if (document.hidden) zPause(); });
+const ZK = { ArrowLeft: "left", a: "left", A: "left", ArrowRight: "right", d: "right", D: "right", ArrowUp: "up", w: "up", W: "up", ArrowDown: "down", s: "down", S: "down" };
+addEventListener("keydown", e => {
+  if (screen !== "zombie") return;
+  if (ZK[e.key]) { zKeys[ZK[e.key]] = true; e.preventDefault(); }
+  if (Z && Z.phase === "upgrade" && ["1", "2", "3"].includes(e.key)) { const b = $("zUps").children[+e.key - 1]; if (b) b.click(); }
+  if ((e.key === "Enter" || e.key === " ") && !$("zGo").hidden && !$("zCard").hidden) { e.preventDefault(); $("zGo").click(); }
+});
+addEventListener("keyup", e => { if (ZK[e.key]) zKeys[ZK[e.key]] = false; });
+addEventListener("blur", () => { for (const k in zKeys) zKeys[k] = false; });
+zfield.addEventListener("pointerdown", e => {
+  if (!Z || !Z.running || $("zCard").contains(e.target)) return;
+  const r = zfield.getBoundingClientRect(); zTouch = { x: e.clientX - r.left, y: e.clientY - r.top }; zfield.setPointerCapture(e.pointerId);
+});
+zfield.addEventListener("pointermove", e => { if (zTouch) { const r = zfield.getBoundingClientRect(); zTouch = { x: e.clientX - r.left, y: e.clientY - r.top }; } });
+zfield.addEventListener("pointerup", () => { zTouch = null; });
+zfield.addEventListener("pointercancel", () => { zTouch = null; });
+zfield.addEventListener("contextmenu", e => e.preventDefault());
+
+// ---------------------------------------------------------------- start
+local(true); checkAchievements(true); renderStats(); renderAch(); renderDotStats(); renderZMine();
+try { const t = localStorage.getItem("click-me-tab"); if (t && TABS.includes(t)) showTab(t); } catch (e) {}
+renderAllBoards();
+// direct links: <artifact link>#clickme, #reddot or #zombies opens that game
+{
+  const DEEP = { clickme: "clicker", reddot: "dot", zombies: "zombie" }, h = (location.hash || "").slice(1).toLowerCase();
+  if (DEEP[h]) { pickIdx = PICKS.indexOf(DEEP[h]); PICKS.forEach((p, k) => $("pick-" + p).setAttribute("aria-selected", String(k === pickIdx))); go(DEEP[h]); }
+}
+
+// ---------------------------------------------------------------- the site's leaderboard
+const API = "/api/arcade";
+let myName = "";
+function localId() {
+  let id = "";
+  try { id = localStorage.getItem("arcade-id") || ""; } catch (e) {}
+  if (!/^[a-z0-9-]{16,64}$/i.test(id)) {
+    id = Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, "0")).join("");
+    try { localStorage.setItem("arcade-id", id); } catch (e) {}
+  }
+  return id;
+}
+function avatarFor(name) {   // a colored circle with the first letter
+  let h = 0; for (const ch of name) h = (h * 31 + ch.codePointAt(0)) % 360;
+  const letter = (name.trim()[0] || "?").toUpperCase().replace(/[<&"]/g, "");
+  return "data:image/svg+xml;utf8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 30"><circle cx="15" cy="15" r="15" fill="hsl(${h},60%,45%)"/><text x="15" y="20" text-anchor="middle" font-family="Arial" font-weight="700" font-size="14" fill="#fff">${letter}</text></svg>`);
+}
+async function refreshBoard() {
+  try {
+    const r = await fetch(API + "/board?me=" + encodeURIComponent(myId), { cache: "no-store" });
+    if (!r.ok) throw new Error("board");
+    players = (await r.json()).players || [];
+    db = db || {}; renderAllBoards();
+  } catch (e) { if (!db) renderAllBoards(); }
+}
+function setName(v) {
+  myName = String(v || "").replace(/[^\p{L}\p{N} _.-]/gu, "").replace(/\s+/g, " ").trim().slice(0, 16);
+  try { localStorage.setItem("arcade-name", myName); } catch (e) {}
+  document.querySelectorAll(".nameIn").forEach(x => { if (x !== document.activeElement) x.value = myName; });
+}
+document.querySelectorAll(".nameIn").forEach(inp => {
+  inp.addEventListener("input", () => setName(inp.value));
+  inp.addEventListener("change", () => { setName(inp.value); inp.value = myName; scheduleSave(true); });
+});
+(async () => {
+  myId = localId(); canSave = true;
+  try { setName(localStorage.getItem("arcade-name") || ""); } catch (e) {}
+  await refreshBoard();
+  if (me.clicks > 0 || me.dotBest > 0 || me.zKills > 0) scheduleSave(true);   // re-send my progress (rebuilds the boards after the site restarts)
+  setInterval(() => { if (!document.hidden) refreshBoard(); }, 15000);
+})();
+</script>
+
+</body></html>
