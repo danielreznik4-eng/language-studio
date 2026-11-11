@@ -20,7 +20,7 @@ const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; ch
 
 const safeName = n => String(n || "").replace(/[^\p{L}\p{N} _.-]/gu, "").trim().slice(0, 80);
 // rooms are simple names used in the link: /daniel, /babushka-lessons
-const RESERVED = new Set(["english", "api", "ws", "index", "public", "arcade", "games"]);
+const RESERVED = new Set(["english", "api", "ws", "index", "public", "arcade", "games", "webcam"]);
 const cleanCode = c => String(c || "").toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 32);
 const validRoom = c => c.length >= 2 && !RESERVED.has(c);
 const newCode = () => { let c; do { c = "class-" + crypto.randomBytes(3).toString("hex"); } while (rooms.has(c)); return c; };
@@ -155,6 +155,7 @@ const server = http.createServer((req, res) => {
   else if (p === "/arcade" || p === "/arcade/") p = "/arcade/index.html";
   else if (p === "/games") { res.writeHead(301, { Location: "/games/" }); return res.end(); }   // the Games app (installable, works offline)
   else if (p === "/games/") p = "/games/index.html";
+  else if (p === "/webcam" || p === "/webcam/") p = "/webcam.html";
   else if (/^\/[a-z0-9-]{2,32}\/?$/i.test(p) && validRoom(cleanCode(p))) p = "/index.html";   // /daniel -> the app, joining room "daniel"
   const file = path.normalize(path.join(PUBLIC, decodeURIComponent(p)));
   if (!file.startsWith(PUBLIC) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) { res.writeHead(404); return res.end("not found"); }
@@ -202,7 +203,9 @@ server.on("upgrade", (req, socket) => {
   const key = req.headers["sec-websocket-key"];
   const accept = crypto.createHash("sha1").update(key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11").digest("base64");
   socket.write("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: " + accept + "\r\n\r\n");
-  const client = { socket, id: crypto.randomUUID().slice(0, 8), role: "student", name: "?", room: null, buf: Buffer.alloc(0), parts: [], partsOp: 1 };
+  const client = { socket, id: crypto.randomUUID().slice(0, 8), role: "student", name: "?", room: null,
+    ip: String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "").split(",")[0].trim(),
+    buf: Buffer.alloc(0), parts: [], partsOp: 1 };
   socket.setNoDelay(true);
   socket.setKeepAlive(true, 30000);
   socket.on("data", d => { client.buf = Buffer.concat([client.buf, d]); readFrames(client); });
@@ -250,15 +253,64 @@ function sendRaw(c, data, op = 1) {
 const send = (c, obj) => sendRaw(c, Buffer.from(JSON.stringify(obj), "utf8"));
 const broadcast = (room, obj, except) => { for (const c of room.clients) if (c !== except) send(c, obj); };
 const roster = room => [...room.clients].map(c => ({ id: c.id, role: c.role, name: c.name, lang: c.lang, inCall: !!c.inCall }));
+const cameraRoster = room => [...room.clients].filter(c => c.kind === "camera").map(c => ({ id: c.id, role: c.role }));
+const cameraFailures = new Map();   // IP -> [wrong passwords, one-minute window]
+function cameraAllowed(c) {
+  const now = Date.now(), row = cameraFailures.get(c.ip) || [0, now];
+  if (now - row[1] > 60000) { row[0] = 0; row[1] = now; }
+  row[0]++; cameraFailures.set(c.ip, row);
+  return row[0] <= 8;
+}
+setInterval(() => { const old = Date.now() - 120000; for (const [ip, row] of cameraFailures) if (row[1] < old) cameraFailures.delete(ip); }, 300000).unref();
 
 function leave(c) {
   const room = c.room; if (!room || !room.clients.delete(c)) return;
   if (!room.clients.size) room.empty = Date.now();
+  if (c.kind === "camera") {
+    if (room.camera?.hostId === c.id) {
+      room.camera.hostId = null; room.camera.live = false;
+      broadcast(room, { type: "camera-offline" });
+    }
+    broadcast(room, { type: "camera-roster", people: cameraRoster(room) });
+    return;
+  }
   broadcast(room, { type: "roster", people: roster(room) });
   broadcast(room, { type: "left", id: c.id });
 }
 
 function onMessage(c, msg) {
+  if (msg.type === "camera-hello") {
+    const code = String(msg.room || "").toLowerCase();
+    if (!/^[a-f0-9]{32}$/.test(code)) return send(c, { type: "camera-error", error: "bad-room" });
+    const isHost = msg.role === "host";
+    const proof = String(msg.proof || "").toLowerCase();
+    if (!/^[a-f0-9]{64}$/.test(proof)) return send(c, { type: "camera-error", error: "password-required" });
+    if (isHost) {
+      const token = String(msg.hostToken || "").toLowerCase();
+      const expected = /^[a-f0-9]{64}$/.test(token) ? crypto.createHash("sha256").update(token).digest("hex").slice(0, 32) : "";
+      if (expected !== code) return send(c, { type: "camera-error", error: "bad-host-link" });
+    }
+    const room = getRoom(code);
+    room.camera ||= { hostId: null, live: false, passwordHash: null };
+    if (isHost) {
+      if (room.camera.hostId && room.camera.hostId !== c.id) return send(c, { type: "camera-error", error: "host-already-connected" });
+      room.camera.passwordHash = proof;
+    } else {
+      const a = Buffer.from(proof, "hex"), b = Buffer.from(room.camera.passwordHash || "", "hex");
+      if (a.length !== b.length || !a.length || !crypto.timingSafeEqual(a, b)) {
+        const allowed = cameraAllowed(c);
+        send(c, { type: "camera-error", error: allowed ? "wrong-password" : "too-many-attempts" });
+        return;
+      }
+      if (cameraRoster(room).filter(p => p.role === "viewer").length >= 20) return send(c, { type: "camera-error", error: "room-full" });
+    }
+    if (c.room) leave(c);
+    c.kind = "camera"; c.role = isHost ? "host" : "viewer"; c.room = room; room.clients.add(c);
+    if (isHost) room.camera.hostId = c.id;
+    send(c, { type: "camera-welcome", id: c.id, role: c.role, live: room.camera.live, hostId: room.camera.hostId });
+    broadcast(room, { type: "camera-roster", people: cameraRoster(room) });
+    return;
+  }
   if (msg.type === "hello") {
     c.role = msg.role === "teacher" ? "teacher" : "student"; c.name = String(msg.name || "?").slice(0, 30); c.lang = msg.lang;
     let code = cleanCode(msg.room);
@@ -270,6 +322,36 @@ function onMessage(c, msg) {
     return;
   }
   const room = c.room; if (!room) return;
+  if (c.kind === "camera") {
+    const cam = room.camera;
+    switch (msg.type) {
+      case "camera-start":
+        if (c.role !== "host") return;
+        cam.live = true; broadcast(room, { type: "camera-live", hostId: c.id }, c); break;
+      case "camera-stop":
+        if (c.role !== "host") return;
+        cam.live = false; broadcast(room, { type: "camera-offline" }, c); break;
+      case "camera-watch":
+        if (c.role !== "viewer" || !cam.live || !cam.hostId) return;
+        for (const t of room.clients) if (t.id === cam.hostId) send(t, { type: "camera-watch", from: c.id, relayMimes: Array.isArray(msg.relayMimes) ? msg.relayMimes.slice(0, 4) : [] });
+        break;
+      case "camera-signal": {
+        const data = msg.data; if (!data || JSON.stringify(data).length > 100000) return;
+        for (const t of room.clients) if (t.id === msg.to && t.kind === "camera" && ((c.role === "host" && t.role === "viewer") || (c.role === "viewer" && t.role === "host")))
+          send(t, { type: "camera-signal", from: c.id, data });
+        break;
+      }
+      case "camera-relay-request":
+        if (c.role !== "viewer" || !cam.live || !cam.hostId) return;
+        for (const t of room.clients) if (t.id === cam.hostId) send(t, { type: "camera-relay-request", from: c.id, relayMimes: Array.isArray(msg.relayMimes) ? msg.relayMimes.slice(0, 4) : [] });
+        break;
+      case "camera-relay-start":
+        if (c.role !== "host") return;
+        for (const t of room.clients) if (t.id === msg.to && t.role === "viewer") send(t, { type: "camera-relay-start", from: c.id, mime: String(msg.mime || "").slice(0, 100) });
+        break;
+    }
+    return;
+  }
   const st = room.state;
   switch (msg.type) {
     case "lesson":

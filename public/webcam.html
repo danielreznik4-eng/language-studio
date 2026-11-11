@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' ws: wss:; media-src 'self' blob:; img-src 'self' data: blob:">
+  <title>Private Webcam Link</title>
+  <style>
+    :root{color-scheme:dark;--bg:#09111f;--card:#121d30;--line:#2a3a55;--text:#f3f7ff;--muted:#9db0cd;--blue:#57a7ff;--green:#45d391;--red:#ff6275}
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(circle at 50% -20%,#203d68 0,#09111f 55%);color:var(--text);font:16px/1.45 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    main{width:min(940px,100%);margin:auto;padding:clamp(18px,4vw,42px)}h1{font-size:clamp(28px,6vw,48px);line-height:1.05;margin:0 0 10px}.sub{color:var(--muted);max-width:700px;margin:0 0 24px}
+    .card{background:rgba(18,29,48,.94);border:1px solid var(--line);border-radius:20px;padding:clamp(18px,4vw,30px);box-shadow:0 22px 70px #0007}.hidden{display:none!important}
+    label{display:block;font-weight:700;margin:15px 0 7px}input{width:100%;font:inherit;color:var(--text);background:#091323;border:1px solid #385071;border-radius:12px;padding:13px 14px;outline:none}input:focus{border-color:var(--blue);box-shadow:0 0 0 3px #57a7ff22}
+    button{font:inherit;font-weight:800;border:0;border-radius:12px;padding:12px 17px;cursor:pointer;background:var(--blue);color:#06101e}button:hover{filter:brightness(1.08)}button:disabled{cursor:not-allowed;opacity:.45}.secondary{background:#273850;color:var(--text)}.danger{background:var(--red);color:white}.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:16px}
+    .status{display:flex;align-items:center;gap:9px;color:var(--muted);margin:0 0 16px}.dot{width:10px;height:10px;border-radius:50%;background:#70809a}.dot.on{background:var(--green);box-shadow:0 0 0 5px #45d39122}.dot.live{background:var(--red);box-shadow:0 0 0 5px #ff627522}
+    .videoWrap{position:relative;overflow:hidden;border-radius:16px;background:#02050a;aspect-ratio:16/9;border:1px solid var(--line)}video{width:100%;height:100%;display:block;object-fit:contain;background:#02050a}.mine{transform:scaleX(-1)}
+    .badge{position:absolute;left:12px;top:12px;background:#080d16d9;border:1px solid #ffffff2b;border-radius:999px;padding:7px 11px;font-size:13px;font-weight:800}.liveBadge{color:#fff;background:#c92d45e8}.details{margin-top:18px;padding-top:18px;border-top:1px solid var(--line)}.copyline{display:grid;grid-template-columns:1fr auto;gap:8px}.note{color:var(--muted);font-size:14px}.warn{color:#ffd17a}.count{margin-left:auto;color:var(--muted);font-weight:700}.check{display:flex;gap:9px;align-items:center;font-weight:700;margin:0}.check input{width:auto}.error{color:#ff9daa;font-weight:700;margin-top:12px}.ok{color:#8ce9b8}
+    @media(max-width:600px){.copyline{grid-template-columns:1fr}.count{width:100%;margin-left:0}.card{border-radius:16px}.row button{flex:1}}
+  </style>
+</head>
+<body>
+<main>
+  <h1>Private Webcam Link</h1>
+  <p class="sub">Broadcast your camera over the internet. Viewers need both the private link and the password. Your camera never starts until you press Start camera and approve permission.</p>
+
+  <section id="createCard" class="card hidden">
+    <h2>Create a protected camera room</h2>
+    <p class="note">Choose a password to tell viewers separately. Use at least 8 characters.</p>
+    <label for="newPassword">Viewer password</label>
+    <input id="newPassword" type="password" minlength="8" autocomplete="new-password" placeholder="Enter a strong password">
+    <div class="row"><button id="createRoom">Create my private links</button></div>
+    <div id="createError" class="error"></div>
+  </section>
+
+  <section id="loginCard" class="card hidden">
+    <div class="status"><span class="dot"></span><span>Protected viewer link</span></div>
+    <h2>Enter the webcam password</h2>
+    <p class="note">Ask the broadcaster for the password. It is not contained in this link.</p>
+    <label for="viewerPassword">Password</label>
+    <input id="viewerPassword" type="password" autocomplete="current-password" placeholder="Webcam password">
+    <div class="row"><button id="unlock">Unlock camera</button></div>
+    <div id="loginError" class="error"></div>
+  </section>
+
+  <section id="hostCard" class="card hidden">
+    <div class="status"><span id="hostDot" class="dot"></span><span id="hostStatus">Connecting securely…</span><span id="viewerCount" class="count">0 viewers</span></div>
+    <div class="videoWrap"><video id="hostVideo" class="mine" muted playsinline></video><span id="hostBadge" class="badge">CAMERA OFF</span></div>
+    <div class="row">
+      <button id="startCamera">Start camera</button>
+      <button id="stopCamera" class="danger" disabled>Stop sharing</button>
+      <label class="check"><input id="includeMic" type="checkbox"> Include microphone</label>
+    </div>
+    <div class="details">
+      <label for="viewerLink">Viewer link to share</label>
+      <div class="copyline"><input id="viewerLink" readonly><button id="copyLink" class="secondary">Copy link</button></div>
+      <p class="note warn">Keep this broadcaster page private. Share only the viewer link and tell trusted viewers the password separately.</p>
+    </div>
+    <div id="hostError" class="error"></div>
+  </section>
+
+  <section id="viewerCard" class="card hidden">
+    <div class="status"><span id="viewerDot" class="dot"></span><span id="viewerStatus">Connecting securely…</span></div>
+    <div class="videoWrap"><video id="viewerVideo" playsinline controls></video><span id="viewerBadge" class="badge">WAITING FOR CAMERA</span></div>
+    <div class="row"><button id="watchCamera" disabled>Watch camera</button></div>
+    <p class="note">The broadcaster can stop sharing at any time. This page cannot turn on your camera.</p>
+    <div id="viewerError" class="error"></div>
+  </section>
+</main>
+<script src="/rtc.js"></script>
+<script src="/webcam.js"></script>
+</body>
+</html>
