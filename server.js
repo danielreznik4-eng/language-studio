@@ -20,7 +20,7 @@ const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; ch
 
 const safeName = n => String(n || "").replace(/[^\p{L}\p{N} _.-]/gu, "").trim().slice(0, 80);
 // rooms are simple names used in the link: /daniel, /babushka-lessons
-const RESERVED = new Set(["english", "api", "ws", "index", "public", "arcade", "games", "webcam"]);
+const RESERVED = new Set(["english", "api", "ws", "index", "public", "arcade", "games", "webcam", "doody"]);
 const cleanCode = c => String(c || "").toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 32);
 const validRoom = c => c.length >= 2 && !RESERVED.has(c);
 const newCode = () => { let c; do { c = "class-" + crypto.randomBytes(3).toString("hex"); } while (rooms.has(c)); return c; };
@@ -156,6 +156,8 @@ const server = http.createServer((req, res) => {
   else if (p === "/games") { res.writeHead(301, { Location: "/games/" }); return res.end(); }   // the Games app (installable, works offline)
   else if (p === "/games/") p = "/games/index.html";
   else if (p === "/webcam" || p === "/webcam/") p = "/webcam.html";
+  else if (p === "/doody") { res.writeHead(301, { Location: "/doody/" }); return res.end(); }   // Call of Doody (3D shooter)
+  else if (p === "/doody/") p = "/doody/index.html";
   else if (/^\/[a-z0-9-]{2,32}\/?$/i.test(p) && validRoom(cleanCode(p))) p = "/index.html";   // /daniel -> the app, joining room "daniel"
   const file = path.normalize(path.join(PUBLIC, decodeURIComponent(p)));
   if (!file.startsWith(PUBLIC) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) { res.writeHead(404); return res.end("not found"); }

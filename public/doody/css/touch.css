@@ -1,0 +1,11 @@
+#touch-controls{display:none;position:fixed;inset:0;z-index:80;pointer-events:none;user-select:none;-webkit-user-select:none;touch-action:none;font-family:Arial,sans-serif}
+#touch-controls.active{display:block}
+.touch-look{position:absolute;right:0;top:0;width:56%;height:100%;pointer-events:auto;touch-action:none}
+.touch-stick{position:absolute;left:4vw;bottom:7vh;width:23vw;height:23vw;max-width:180px;max-height:180px;min-width:120px;min-height:120px;border-radius:50%;background:#1118;border:3px solid #ffffff70;pointer-events:auto;touch-action:none;box-shadow:0 4px 24px #0008}
+.touch-stick-knob{position:absolute;left:50%;top:50%;width:42%;height:42%;transform:translate(-50%,-50%);border-radius:50%;background:#ffffff80;border:2px solid #fff9;box-shadow:0 3px 12px #0008}
+.touch-actions{position:absolute;right:2.2vw;bottom:3vh;width:min(43vw,430px);height:min(42vh,330px);pointer-events:none}
+.touch-btn{position:absolute;width:64px;height:64px;border-radius:50%;border:2px solid #ffffffa0;background:#181525b8;color:white;font-weight:900;font-size:13px;display:grid;place-items:center;pointer-events:auto;touch-action:none;text-shadow:0 2px 3px #000;box-shadow:0 4px 14px #0009}
+.touch-btn:active,.touch-btn.held{background:#7657ffe0;transform:scale(.94)}
+.touch-btn.fire{right:0;bottom:54px;width:94px;height:94px;background:#d52b3dc7;font-size:17px}.touch-btn.aim{right:102px;bottom:8px}.touch-btn.jump{right:104px;bottom:104px}.touch-btn.reload{right:190px;bottom:15px}.touch-btn.use{right:198px;bottom:94px}.touch-btn.crouch{right:278px;bottom:22px}.touch-btn.drop{right:282px;bottom:104px}.touch-btn.grenade{right:18px;bottom:164px}
+.touch-pause{position:absolute;right:16px;top:14px;width:48px;height:42px;border-radius:11px;border:2px solid #fff8;background:#111a;color:white;font-size:18px;font-weight:bold;pointer-events:auto;touch-action:none}
+@media(max-width:720px){.touch-btn{width:54px;height:54px;font-size:11px}.touch-btn.fire{width:78px;height:78px}.touch-btn.aim{right:82px}.touch-btn.jump{right:84px;bottom:90px}.touch-btn.reload{right:150px}.touch-btn.use{right:154px;bottom:82px}.touch-btn.crouch{right:216px}.touch-btn.drop{right:218px;bottom:84px}.touch-btn.grenade{bottom:138px}.touch-actions{width:370px;height:270px}}
